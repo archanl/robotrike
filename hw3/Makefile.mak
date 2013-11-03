@@ -1,3 +1,10 @@
+# EE/CS 51
+# HW3 - Queue Routines
+# Archan Luhar
+# TA: Joe Greef
+
+# Makefile.mak
+
 all: assemble link locate
 
 check:
