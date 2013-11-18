@@ -1,0 +1,199 @@
+8086/87/88/186 MACRO ASSEMBLER    HW3MAIN                                                  22:33:58  11/10/;3  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE HW3MAIN
+OBJECT MODULE PLACED IN HW3MAIN.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE HW3MAIN.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1         NAME    HW3MAIN
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                                   HW3MAIN                                  ;
+                             6     ;                             Homework 3 Main Loop                           ;
+                             7     ;                                  EE/CS 51                                  ;
+                             8     ;                                 Archan Luhar                               ;
+                             9     ;                                 TA: Joe Greef                              ;
+                            10     ;                                                                            ;
+                            11     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                            12     
+                            13     ; Description:      This program allocates space for myQueue and calls my own
+                            14     ;                   defined MyQueueTest which is used for stepping through
+                            15     ;                   element enqueuing and dequeuing to check correct memory.
+                            16     ;                   This program also calls the QueueTest function provided by
+                            17     ;                   Glen.
+                            18     ;
+                            19     ; Input:            None.
+                            20     ; Output:           None.
+                            21     ;
+                            22     ; User Interface:   None. User can set breakpoint at MyQueueTest to step through
+                            23     ;                   sample queue additions and removals to see changes in
+                            24     ;                   the memory storing the queue.
+                            25     ;                   If QueueTest succeeds, infinite loop occurs at
+                            26     ;                   breakpoint hw3test.QueueGood.
+                            27     ;
+                            28     ; Error Handling:   If QueueTest fails, infinite loop occurs at breakpoint
+                            29     ;                   hw3test.QueueError.
+                            30     ;
+                            31     ; Algorithms:       None.
+                            32     ; Data Structures:  Queue struct is defined in queue.inc. It uses a cyclic array
+                            33     ;
+                            34     ; Known Bugs:       None.
+                            35     ; Limitations:      There must be less than 1024 bytes of elements.
+                            36     ;
+                            37     ; Revision History:
+                            38     ;    11/02/13  Archan Luhar     Created hw3main.asm. Contains main function
+                            39     ;                               that calls test functions. Also allocates
+                            40     ;                               queue struct in DS.
+                            41     
+                            42     
+                            43     ; Include file defines queue metadata offset constants
+                            44 +1  $INCLUDE(queue.inc)
+                      =1    45     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    46     ;                                                                            ;
+                      =1    47     ;                                    QUEUE                                   ;
+                      =1    48     ;                       Queue Routine Include Definitions                    ;
+                      =1    49     ;                                   EE/CS 51                                 ;
+                      =1    50     ;                                 Archan Luhar                               ;
+8086/87/88/186 MACRO ASSEMBLER    HW3MAIN                                                  22:33:58  11/10/;3  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                      =1    51     ;                                 TA: Joe Greef                              ;
+                      =1    52     ;                                                                            ;
+                      =1    53     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    54     
+                      =1    55     ; Defines queue metadata byte offset constants and test function constants
+                      =1    56     
+  0100                =1    57     QUEUE_TEST_LENGTH                       EQU     256
+                      =1    58     
+                      =1    59     ; Number of bytes of metadata before the queue elements data starts
+  0007                =1    60     QUEUE_QUEUE_OFFSET          EQU     7
+                      =1    61     
+                      =1    62     ; Maximum number of bytes of queue data in the queue struct.
+                      =1    63     ; The queue struct must me initialized with less bytes than this max number.
+                      =1    64     ; E.g. 256 word sized elements = 512 bytes: good
+                      =1    65     ; E.g. 512 byte sized elements = 512 bytes: good
+                      =1    66     ; E.g. 512 word sized elements = 1024 bytes: good
+                      =1    67     ; E.g. 1024 word sized elements = 2048 bytes: not good
+  0400                =1    68     QUEUE_MAX_BYTES             EQU     1024
+                      =1    69     
+                      =1    70     ; Defines the number of bytes in the two possible element sizes byte and word
+  0001                =1    71     ELEM_BYTE_SIZE              EQU     1
+  0002                =1    72     ELEM_WORD_SIZE              EQU     2
+                      =1    73     
+                      =1    74     
+                      =1    75     ; Queue Structure which defines the metadata and the start of the queue
+                      =1    76     ; elements data.
+                      =1    77     ; elem_size:    1 if each element is byte, 2 if each element is a word
+                      =1    78     ; len:          Max number of elements in queue
+                      =1    79     ; head_index:   Number of elements offset from start of queue elements data
+                      =1    80     ; count:        Current number of elements in the queue.
+                      =1    81     ; queue:        Start of queue elements.
+----                  =1    82     queueSTRUC STRUC 
+0000                  =1    83         elem_size   DB  ?
+0001                  =1    84         len         DW  ? 
+0003                  =1    85         head_index  DW  ?
+0005                  =1    86         count       DW  ?
+0007                  =1    87         queue       DB  QUEUE_MAX_BYTES DUP (?)
+----                  =1    88     queueSTRUC ENDS
+                            89     
+                            90     
+                            91     CGROUP  GROUP   CODE
+                            92     DGROUP  GROUP   DATA, STACK
+                            93     
+                            94     
+                            95     
+----                        96     CODE    SEGMENT PUBLIC 'CODE'
+                            97     
+                            98     
+                            99         ASSUME  CS:CGROUP, DS:DGROUP
+                           100     
+                           101     
+                           102     
+                           103     ;external function declarations
+                           104     
+                           105         EXTRN   QueueInit:NEAR
+8086/87/88/186 MACRO ASSEMBLER    HW3MAIN                                                  22:33:58  11/10/;3  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           106         EXTRN   QueueEmpty:NEAR
+                           107         EXTRN   QueueFull:NEAR
+                           108         EXTRN   Dequeue:NEAR
+                           109         EXTRN   Enqueue:NEAR
+                           110         EXTRN   QueueTest:NEAR
+                           111     
+                           112     
+                           113     
+0000                       114     START:  
+                           115     
+0000                       116     MAIN:
+0000 B8----         R      117         MOV     AX, DGROUP              ;initialize the stack pointer
+0003 8ED0                  118         MOV     SS, AX
+0005 BCE00190       R      119         MOV     SP, OFFSET(DGROUP:TopOfStack)
+                           120     
+0009 B8----         R      121         MOV     AX, DGROUP              ;initialize the data segment
+000C 8ED8                  122         MOV     DS, AX
+                           123     
+000E BE000090       R      124         MOV     SI, OFFSET(myQueue)     ; Let SI be the pointer to the queue
+0012 B80001                125         MOV     AX, QUEUE_TEST_LENGTH   ; Set size to that defined in inc
+0015 B301                  126         MOV     BL, ELEM_BYTE_SIZE      ; Set element size to byte
+0017 E80000         E      127         CALL    QueueInit               ; Initialize the queue
+                           128     
+001A E80600                129         CALL    MyQueueTest             ; Test out the queue briefly
+                           130     
+001D B90001                131         MOV     CX, QUEUE_TEST_LENGTH   ; Pass the queue and queue length to
+0020 E80000         E      132         CALL    QueueTest               ; provided test function.
+                           133     
+                           134     
+                           135     ; Enqueues a bunch of numbers to see if properly stored. Must use debugger
+                           136     ; to verify queue data in memory at SI.
+0023                       137     MyQueueTest:
+0023 B80210                138         MOV AX, 1002H;
+0026 E80000         E      139         CALL Enqueue;
+0029 B80430                140         MOV AX, 3004H;
+002C E80000         E      141         CALL Enqueue;
+002F B80650                142         MOV AX, 5006H;
+0032 E80000         E      143         CALL Enqueue;
+0035 B80870                144         MOV AX, 7008H;
+0038 E80000         E      145         CALL Enqueue;
+003B B80090                146         MOV AX, 9000H;
+003E E80000         E      147         CALL Enqueue;
+0041 E80000         E      148         CALL QueueEmpty;
+0044 E80000         E      149         CALL QueueFull;
+0047 E80000         E      150         CALL Dequeue;
+                           151     
+----                       152     DATA SEGMENT PUBLIC 'DATA'
+0000 ??                    153         myQueue   queueSTRUC  <>
+0001 ????
+0003 ????
+0005 ????
+0007 (1024
+     ??
+     )
+----                       154     DATA ENDS
+8086/87/88/186 MACRO ASSEMBLER    HW3MAIN                                                  22:33:58  11/10/;3  PAGE    4
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           155     
+                           156     
+----                       157     STACK SEGMENT STACK 'STACK'
+0000 (80                   158         DB      80 DUP ('Stack ')       ;240 words
+     537461636B20
+     )
+01E0                       159     TopOfStack      LABEL   WORD
+----                       160     STACK  ENDS
+                           161     
+                           162     
+----                       163     CODE ENDS
+                           164         END START
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

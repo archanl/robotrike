@@ -1,0 +1,775 @@
+8086/87/88/186 MACRO ASSEMBLER    EHDEMO                                                   00:07:52  11/11/;3  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE EHDEMO
+OBJECT MODULE PLACED IN EHDEMO.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE EHDEMO.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1            NAME  EHDEMO
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                                    EHDEMO                                  ;
+                             6     ;                              Event Handler Demo                            ;
+                             7     ;                                                                            ;
+                             8     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             9     
+                            10     ; Description:      This program is a demonstration program to show an
+                            11     ;                   example of an event handler (interrupt service routine).
+                            12     ;                   It just cycles the segments on the target board displays
+                            13     ;                   at the rate of MS_PER_SEG (milliseconds per segment).
+                            14     ;
+                            15     ; Input:            None.
+                            16     ; Output:           The segments on the displays are cycled in a figure eight
+                            17     ;                   pattern (abgedcgfa).  A new segment is output every
+                            18     ;                   interrupt.
+                            19     ;
+                            20     ; User Interface:   None, segments are just cycled.
+                            21     ; Error Handling:   None.
+                            22     ;
+                            23     ; Algorithms:       None.
+                            24     ; Data Structures:  None.
+                            25     ;
+                            26     ; Revision History:
+                            27     ;    11/11/92  Glen George      initial revision (originally ISRDEMO.ASM)
+                            28     ;    10/27/93  Glen George      changed name to EHDEMO
+                            29     ;                               split into two files (.ASM and .INC)
+                            30     ;                               updated comments
+                            31     ;    10/24/94  Glen George      moved call to InitCS so memory is mapped
+                            32     ;                                  BEFORE store values in variables
+                            33     ;                               added complete vector table initialization and
+                            34     ;                                  IllegalEventHandler
+                            35     ;                               changed code segment name from PROG to PROGRAM
+                            36     ;                               updated comments in InitTimer and stack area
+                            37     ;    10/25/95  Glen George      adjusted timer for 18.432 MHz clock instead of
+                            38     ;                                  16 MHz
+                            39     ;                               updated comments
+                            40     ;    10/28/96  Glen George      used COUNTS_PER_MS and MS_PER_SEG in InitTimer
+                            41     ;                                  instead of "magic numbers"
+                            42     ;                               updated comments
+                            43     ;    11/13/96  Glen George      updated comments
+                            44     ;    10/29/97  Glen George      changed all PCB writes to use AL (still writes
+                            45     ;                                  16-bits, see page 4-5 of the
+                            46     ;                                  80C186XL/80C188XL Microprocessor User's
+                            47     ;                                  Manual)
+                            48     ;                               setup to skip IllegalEventHandler writes to
+                            49     ;                                  first RESERVED_VECS vectors
+                            50     ;                               changed name of stack segment
+8086/87/88/186 MACRO ASSEMBLER    EHDEMO                                                   00:07:52  11/11/;3  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                            51     ;                               updated comments
+                            52     ;    10/10/98  Glen George      updated comments
+                            53     ;    12/26/99  Glen George      changed segment pattern that is output
+                            54     ;                               updated comments
+                            55     ;    12/25/00  Glen George      send a non-specific EOI in the illegal event
+                            56     ;                                  handler
+                            57     ;                               updated comments
+                            58     ;     1/28/02  Glen George      switched to using ES to install event handlers
+                            59     ;                               updated comments
+                            60     ;     2/06/03  Glen George      changed NO_DIGITS to NUM_DIGITS and added use
+                            61     ;                                  of NUM_IRQ_VECTORS
+                            62     ;                               changed label names for clarity
+                            63     ;                               changed Timer0EOI to TimerEOI
+                            64     ;                               use TimerEOI when setup timer (instead of a
+                            65     ;                                  non-specific EOI)
+                            66     ;                               updated comments
+                            67     ;     1/22/04  Glen George      updated comments
+                            68     ;     2/05/05  Glen George      changed ClrIRQVectors to have a starting and
+                            69     ;                                  ending number for reserved vectors instead
+                            70     ;                                  of assuming they start at vector 0
+                            71     
+                            72     
+                            73     
+                            74     ; local include files
+                            75 +1  $INCLUDE(EHDEMO.INC)
+                      =1    76     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    77     ;                                                                            ;
+                      =1    78     ;                                  EHDEMO.INC                                ;
+                      =1    79     ;                              Event Handler Demo                            ;
+                      =1    80     ;                                 Include File                               ;
+                      =1    81     ;                                                                            ;
+                      =1    82     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    83     
+                      =1    84     ; This file contains the definitions for the Event Handler Demonstration
+                      =1    85     ; program (EHDEMO.ASM).
+                      =1    86     ;
+                      =1    87     ; Revision History:
+                      =1    88     ;    11/11/92  Glen George      initial revision (originally part of
+                      =1    89     ;                                  ISRDEMO.ASM)
+                      =1    90     ;    10/27/93  Glen George      split definitions into own file (EHDEMO.INC)
+                      =1    91     ;                               updated/corrected comments
+                      =1    92     ;    10/24/94  Glen George      added Revision History section
+                      =1    93     ;                               updated comments
+                      =1    94     ;    10/25/95  Glen George      updated comments
+                      =1    95     ;    10/28/96  Glen George      added COUNTS_PER_MS and MS_PER_SEG constants
+                      =1    96     ;                               updated comments
+                      =1    97     ;    10/28/97  Glen George      added RESERVED_VECS constant
+                      =1    98     ;                               changed PACSVal and MPCSVal to not set
+                      =1    99     ;                                  reserved bits and set 3 wait states
+                      =1   100     ;                               updated comments
+                      =1   101     ;    12/26/99  Glen George      updated comments
+                      =1   102     ;     2/13/01  Glen George      changed MPCSVAL to a legal value
+                      =1   103     ;     2/03/03  Glen George      changed NO_DIGITS to NUM_DIGITS
+                      =1   104     ;                               changed Timer0EOI to TimerEOI
+                      =1   105     ;                               added NUM_IRQ_VECTORS
+8086/87/88/186 MACRO ASSEMBLER    EHDEMO                                                   00:07:52  11/11/;3  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                      =1   106     ;                               updated comments
+                      =1   107     ;     1/28/04  Glen George      updated comments
+                      =1   108     ;     2/05/05  Glen George      added FIRST_RESERVED_VEC and LAST_RESERVED_VEC
+                      =1   109     ;                                  and removed RESERVED_VECS for new version
+                      =1   110     ;                                  of ClrIRQVectors
+                      =1   111     ;                               updated comments
+                      =1   112     
+                      =1   113     
+                      =1   114     
+                      =1   115     ; Timer Definitions
+                      =1   116     
+                      =1   117     ; Addresses
+  FF56                =1   118     Tmr0Ctrl        EQU     0FF56H          ;address of Timer 0 Control Register
+  FF52                =1   119     Tmr0MaxCntA     EQU     0FF52H          ;address of Timer 0 Max Count A Register
+  FF50                =1   120     Tmr0Count       EQU     0FF50H          ;address of Timer 0 Count Register
+  FF66                =1   121     Tmr2Ctrl        EQU     0FF66H          ;address of Timer 2 Control Register
+  FF62                =1   122     Tmr2MaxCnt      EQU     0FF62H          ;address of Timer 2 Max Count A Register
+  FF60                =1   123     Tmr2Count       EQU     0FF60H          ;address of Timer 2 Count Register
+                      =1   124     
+                      =1   125     ; Control Register Values
+  E009                =1   126     Tmr0CtrlVal     EQU     0E009H          ;value to write to Timer 0 Control Register
+                      =1   127                                             ;1---------------  enable timer
+                      =1   128                                             ;-1--------------  write to control
+                      =1   129                                             ;--1-------------  enable interrupts
+                      =1   130                                             ;----000000------  reserved
+                      =1   131                                             ;---0------0-----  read only
+                      =1   132                                             ;-----------0----  TMRIN0 is an enable
+                      =1   133                                             ;------------10--  count timer 2 outs
+                      =1   134                                             ;--------------0-  single counter mode
+                      =1   135                                             ;---------------1  continuous mode
+  C001                =1   136     Tmr2CtrlVal     EQU     0C001H          ;value to write to Timer 2 Control Register
+                      =1   137                                             ;1---------------  enable timer
+                      =1   138                                             ;-1--------------  write to control
+                      =1   139                                             ;--0-------------  no interrupts
+                      =1   140                                             ;----000000-0000-  reserved
+                      =1   141                                             ;---0------0-----  read only
+                      =1   142                                             ;---------------1  continuous mode
+                      =1   143     
+                      =1   144     ; Interrupt Vectors
+  0008                =1   145     Tmr0Vec         EQU     8               ;interrupt vector for Timer 0
+                      =1   146     
+                      =1   147     
+                      =1   148     ; Interrupt Controller Definitions
+                      =1   149     
+                      =1   150     ; Addresses
+  FF32                =1   151     INTCtrlrCtrl    EQU     0FF32H          ;address of interrupt controller for timer
+  FF22                =1   152     INTCtrlrEOI     EQU     0FF22H          ;address of interrupt controller EOI register
+                      =1   153     
+                      =1   154     ; Register Values
+  0001                =1   155     INTCtrlrCVal    EQU     00001H          ;set priority for timers to 1 and enable
+                      =1   156                                             ;000000000000----  reserved
+                      =1   157                                             ;------------0---  enable timer interrupt
+                      =1   158                                             ;-------------001  timer priority
+  0008                =1   159     TimerEOI        EQU     00008H          ;Timer EOI command (same for all timers)
+  8000                =1   160     NonSpecEOI      EQU     08000H          ;Non-specific EOI command
+8086/87/88/186 MACRO ASSEMBLER    EHDEMO                                                   00:07:52  11/11/;3  PAGE    4
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                      =1   161     
+                      =1   162     
+                      =1   163     ; Chip Select Unit Definitions
+                      =1   164     
+                      =1   165     ; Addresses
+  FFA4                =1   166     PACSreg         EQU     0FFA4H          ;address of PACS register
+  FFA8                =1   167     MPCSreg         EQU     0FFA8H          ;address of MPCS register
+                      =1   168     
+                      =1   169     ; Control Register Values
+  0003                =1   170     PACSval         EQU     00003H          ;PCS base at 0, 3 wait states
+                      =1   171                                             ;0000000000------  starts at address 0
+                      =1   172                                             ;----------000---  reserved
+                      =1   173                                             ;-------------0--  wait for RDY inputs
+                      =1   174                                             ;--------------11  3 wait states
+  0183                =1   175     MPCSval         EQU     00183H          ;PCS in I/O space, use PCS5/6, 3 wait states
+                      =1   176                                             ;0---------000---  reserved
+                      =1   177                                             ;-0000001--------  MCS is 8KB
+                      =1   178                                             ;--------1-------  output PCS5/PCS6
+                      =1   179                                             ;---------0------  PCS in I/O space
+                      =1   180                                             ;-------------0--  wait for RDY inputs
+                      =1   181                                             ;--------------11  3 wait states
+                      =1   182     
+                      =1   183     
+                      =1   184     
+                      =1   185     ; Timing Definitions
+                      =1   186     
+  0900                =1   187     COUNTS_PER_MS   EQU     2304            ;number of timer counts per 1 ms (assumes 18.
+                                   432 MHz clock)
+  00C8                =1   188     MS_PER_SEG      EQU     200             ;number of ms for each segment
+                      =1   189     
+                      =1   190     
+                      =1   191     
+                      =1   192     ; General Definitions
+                      =1   193     
+  0001                =1   194     FIRST_RESERVED_VEC      EQU     1       ;reserve vectors 1-3
+  0003                =1   195     LAST_RESERVED_VEC       EQU     3
+  0100                =1   196     NUM_IRQ_VECTORS         EQU     256     ;number of interrupt vectors
+                      =1   197     
+  0000                =1   198     LEDDisplay      EQU     0000H           ;display address
+                      =1   199     
+  0008                =1   200     NUM_DIGITS      EQU     8               ;number of digits in the display
+                           201     
+                           202     
+                           203     
+                           204     
+----                       205     PROGRAM SEGMENT PUBLIC 'CODE'
+                           206     
+                           207             ASSUME  CS:PROGRAM, DS:DATA, SS:STACK
+                           208     
+                           209     
+                           210     
+0000                       211     START:  
+                           212     
+0000                       213     MAIN:
+0000 B8----         R      214             MOV     AX, STACK               ;initialize the stack pointer
+8086/87/88/186 MACRO ASSEMBLER    EHDEMO                                                   00:07:52  11/11/;3  PAGE    5
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0003 8ED0                  215             MOV     SS, AX
+0005 BCE00190       R      216             MOV     SP, OFFSET(TopOfStack)
+                           217     
+0009 B8----         R      218             MOV     AX, DATA                ;initialize the data segment
+000C 8ED8                  219             MOV     DS, AX
+                           220     
+                           221     
+000E E85B00                222             CALL    InitCS                  ;initialize the 80188 chip selects
+                           223                                             ;   assumes LCS and UCS already setup
+                           224     
+0011 E8B100                225             CALL    ClrIRQVectors           ;clear (initialize) interrupt vector table
+                           226     
+                           227                                             ;initialize the variables for the timer event
+                                    handler
+0014 C70600000000   R      228             MOV     Digit, 0                ;start on digit 0
+001A C60602000090   R      229             MOV     Segmnt, 0               ;start with segment pattern 0
+                           230     
+0020 E88F00                231             CALL    InstallHandler          ;install the event handler
+                           232                                             ;   ALWAYS install handlers before
+                           233                                             ;   allowing the hardware to interrupt.
+                           234     
+0023 E85500                235             CALL    InitTimer               ;initialize the internal timer
+0026 FB                    236             STI                             ;and finally allow interrupts.
+                           237     
+0027 EBFE                  238     Forever: JMP    Forever                 ;sit in an infinite loop, nothing to
+                           239                                             ;   do in the background routine
+0029 F4                    240             HLT                             ;never executed (hopefully)
+                           241     
+                           242     
+                           243     
+                           244     
+                           245     ; TimerEventHandler
+                           246     ;
+                           247     ; Description:       This procedure is the event handler for the timer
+                           248     ;                    interrupt.  It outputs the next segment pattern to the
+                           249     ;                    LED display.  After going through all the segment
+                           250     ;                    patterns for a digit it goes on to the next digit.  After
+                           251     ;                    doing all the digits it starts over again.
+                           252     ;
+                           253     ; Operation:         Output the segment pattern to the LED then update the
+                           254     ;                    segment pattern index.  If at the end of the segment
+                           255     ;                    patterns, update the LED number.  If at the end of the
+                           256     ;                    LEDs, wrap back to the first one.
+                           257     ;
+                           258     ; Arguments:         None.
+                           259     ; Return Value:      None.
+                           260     ;
+                           261     ; Local Variables:   BX - segment table pointer.
+                           262     ;                    DX - display pointer.
+                           263     ; Shared Variables:  None.
+                           264     ; Global Variables:  Digit  - indicates digit to which to output (updated).
+                           265     ;                    Segmnt - indicates segment pattern to output (updated).
+                           266     ;
+                           267     ; Input:             None.
+                           268     ; Output:            A segment to the display.
+8086/87/88/186 MACRO ASSEMBLER    EHDEMO                                                   00:07:52  11/11/;3  PAGE    6
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           269     ;
+                           270     ; Error Handling:    None.
+                           271     ;
+                           272     ; Algorithms:        None.
+                           273     ; Data Structures:   None.
+                           274     ;
+                           275     ; Registers Changed: None
+                           276     ; Stack Depth:       3 words
+                           277     ;
+                           278     ; Author:            Glen George
+                           279     ; Last Modified:     Jan. 27, 2003
+                           280     
+002A                       281     TimerEventHandler       PROC    NEAR
+                           282     
+002A 50                    283             PUSH    AX                      ;save the registers
+002B 53                    284             PUSH    BX                      ;Event Handlers should NEVER change
+002C 52                    285             PUSH    DX                      ;   any register values
+                           286     
+                           287     
+002D                       288     DisplayUpdate:                          ;update the display
+002D BA0000                289             MOV     DX, LEDDisplay          ;get the display address
+0030 03160000       R      290             ADD     DX, Digit               ;get offset for current digit
+                           291     
+0034 A00200         R      292             MOV     AL, Segmnt              ;get the segment pattern number
+0037 BBF70090       R      293             MOV     BX, OFFSET(SegPatTable) ;and lookup the pattern
+003B 2ED7                  294             XLAT    CS:SegPatTable          ;segment override needed because the
+                           295                                             ;table definition is in the code segment
+                           296     
+003D EE                    297             OUT     DX, AL                  ;output segment
+                           298     
+                           299     
+003E                       300     NextSegment:                            ;do the next segment pattern
+003E FE060200       R      301             INC     Segmnt                  ;update segment pattern number
+0042 803E02000990   R      302             CMP     Segmnt, NO_SEG_PAT      ;are we all done with this digit ?
+0048 7217                  303             JB      SameDigit
+                           304             ;JAE    NextDigit
+                           305     
+                           306     
+004A                       307     NextDigit:                              ;do the next digit
+004A C60602000090   R      308             MOV     Segmnt, 0               ;reset the segment pattern number
+0050 FF060000       R      309             INC     Digit                   ;update digit number
+0054 833E000008     R      310             CMP     Digit, NUM_DIGITS       ;have we done all the digits ?
+0059 7206                  311             JB      SkipDigitWrap
+005B                       312     DigitWrap:                              ;if so, wrap the digit number back to 0
+005B C70600000000   R      313             MOV     Digit, 0
+0061                       314     SkipDigitWrap:
+                           315             ;JMP    EndTimerEventHandler    ;done with the event handler
+                           316     
+                           317     
+0061                       318     SameDigit:                              ;on the same digit - all done
+                           319             ;JMP    EndTimerEventHandler
+                           320     
+                           321     
+0061                       322     EndTimerEventHandler:                   ;done taking care of the timer
+                           323     
+8086/87/88/186 MACRO ASSEMBLER    EHDEMO                                                   00:07:52  11/11/;3  PAGE    7
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0061 BA22FF                324             MOV     DX, INTCtrlrEOI         ;send the EOI to the interrupt controller
+0064 B80800                325             MOV     AX, TimerEOI
+0067 EE                    326             OUT     DX, AL
+                           327     
+0068 5A                    328             POP     DX                      ;restore the registers
+0069 5B                    329             POP     BX
+006A 58                    330             POP     AX
+                           331     
+                           332     
+006B CF                    333             IRET                            ;and return (Event Handlers end with IRET not
+                                    RET)
+                           334     
+                           335     
+                           336     TimerEventHandler       ENDP
+                           337     
+                           338     
+                           339     
+                           340     
+                           341     ; InitCS
+                           342     ;
+                           343     ; Description:       Initialize the Peripheral Chip Selects on the 80188.
+                           344     ;
+                           345     ; Operation:         Write the initial values to the PACS and MPCS registers.
+                           346     ;
+                           347     ; Arguments:         None.
+                           348     ; Return Value:      None.
+                           349     ;
+                           350     ; Local Variables:   None.
+                           351     ; Shared Variables:  None.
+                           352     ; Global Variables:  None.
+                           353     ;
+                           354     ; Input:             None.
+                           355     ; Output:            None.
+                           356     ;
+                           357     ; Error Handling:    None.
+                           358     ;
+                           359     ; Algorithms:        None.
+                           360     ; Data Structures:   None.
+                           361     ;
+                           362     ; Registers Changed: AX, DX
+                           363     ; Stack Depth:       0 words
+                           364     ;
+                           365     ; Author:            Glen George
+                           366     ; Last Modified:     Oct. 29, 1997
+                           367     
+006C                       368     InitCS  PROC    NEAR
+                           369     
+                           370     
+006C BAA4FF                371             MOV     DX, PACSreg     ;setup to write to PACS register
+006F B80300                372             MOV     AX, PACSval
+0072 EE                    373             OUT     DX, AL          ;write PACSval to PACS (base at 0, 3 wait states)
+                           374     
+0073 BAA8FF                375             MOV     DX, MPCSreg     ;setup to write to MPCS register
+0076 B88301                376             MOV     AX, MPCSval
+0079 EE                    377             OUT     DX, AL          ;write MPCSval to MPCS (I/O space, 3 wait states)
+8086/87/88/186 MACRO ASSEMBLER    EHDEMO                                                   00:07:52  11/11/;3  PAGE    8
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           378     
+                           379     
+007A C3                    380             RET                     ;done so return
+                           381     
+                           382     
+                           383     InitCS  ENDP
+                           384     
+                           385     
+                           386     
+                           387     
+                           388     ; InitTimer
+                           389     ;
+                           390     ; Description:       Initialize the 80188 Timers.  The timers are initialized
+                           391     ;                    to generate interrupts every MS_PER_SEG milliseconds.
+                           392     ;                    The interrupt controller is also initialized to allow the
+                           393     ;                    timer interrupts.  Timer #2 is used to prescale the
+                           394     ;                    internal clock from 2.304 MHz to 1 KHz.  Timer #0 then
+                           395     ;                    counts MS_PER_SEG timer #2 intervals to generate the
+                           396     ;                    interrupts.
+                           397     ;
+                           398     ; Operation:         The appropriate values are written to the timer control
+                           399     ;                    registers in the PCB.  Also, the timer count registers
+                           400     ;                    are reset to zero.  Finally, the interrupt controller is
+                           401     ;                    setup to accept timer interrupts and any pending
+                           402     ;                    interrupts are cleared by sending a TimerEOI to the
+                           403     ;                    interrupt controller.
+                           404     ;
+                           405     ; Arguments:         None.
+                           406     ; Return Value:      None.
+                           407     ;
+                           408     ; Local Variables:   None.
+                           409     ; Shared Variables:  None.
+                           410     ; Global Variables:  None.
+                           411     ;
+                           412     ; Input:             None.
+                           413     ; Output:            None.
+                           414     ;
+                           415     ; Error Handling:    None.
+                           416     ;
+                           417     ; Algorithms:        None.
+                           418     ; Data Structures:   None.
+                           419     ;
+                           420     ; Registers Changed: AX, DX
+                           421     ; Stack Depth:       0 words
+                           422     ;
+                           423     ; Author:            Glen George
+                           424     ; Last Modified:     Oct. 29, 1997
+                           425     
+007B                       426     InitTimer       PROC    NEAR
+                           427     
+                           428                                     ;initialize Timer #2 as a prescalar
+007B BA60FF                429             MOV     DX, Tmr2Count   ;initialize the count register to 0
+007E 33C0                  430             XOR     AX, AX
+0080 EE                    431             OUT     DX, AL
+                           432     
+8086/87/88/186 MACRO ASSEMBLER    EHDEMO                                                   00:07:52  11/11/;3  PAGE    9
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0081 BA62FF                433             MOV     DX, Tmr2MaxCnt  ;setup max count for 1ms counts
+0084 B80009                434             MOV     AX, COUNTS_PER_MS
+0087 EE                    435             OUT     DX, AL
+                           436     
+0088 BA66FF                437             MOV     DX, Tmr2Ctrl    ;setup the control register, no interrupts
+008B B801C0                438             MOV     AX, Tmr2CtrlVal
+008E EE                    439             OUT     DX, AL
+                           440     
+                           441                                     ;initialize Timer #0 for MS_PER_SEG ms interrupts
+008F BA50FF                442             MOV     DX, Tmr0Count   ;initialize the count register to 0
+0092 33C0                  443             XOR     AX, AX
+0094 EE                    444             OUT     DX, AL
+                           445     
+0095 BA52FF                446             MOV     DX, Tmr0MaxCntA ;setup max count for milliseconds per segment
+0098 B8C800                447             MOV     AX, MS_PER_SEG  ;   count so can time the segments
+009B EE                    448             OUT     DX, AL
+                           449     
+009C BA56FF                450             MOV     DX, Tmr0Ctrl    ;setup the control register, interrupts on
+009F B809E0                451             MOV     AX, Tmr0CtrlVal
+00A2 EE                    452             OUT     DX, AL
+                           453     
+                           454                                     ;initialize interrupt controller for timers
+00A3 BA32FF                455             MOV     DX, INTCtrlrCtrl;setup the interrupt control register
+00A6 B80100                456             MOV     AX, INTCtrlrCVal
+00A9 EE                    457             OUT     DX, AL
+                           458     
+00AA BA22FF                459             MOV     DX, INTCtrlrEOI ;send a timer EOI (to clear out controller)
+00AD B80800                460             MOV     AX, TimerEOI
+00B0 EE                    461             OUT     DX, AL
+                           462     
+                           463     
+00B1 C3                    464             RET                     ;done so return
+                           465     
+                           466     
+                           467     InitTimer       ENDP
+                           468     
+                           469     
+                           470     
+                           471     
+                           472     ; InstallHandler
+                           473     ;
+                           474     ; Description:       Install the event handler for the timer interrupt.
+                           475     ;
+                           476     ; Operation:         Writes the address of the timer event handler to the
+                           477     ;                    appropriate interrupt vector.
+                           478     ;
+                           479     ; Arguments:         None.
+                           480     ; Return Value:      None.
+                           481     ;
+                           482     ; Local Variables:   None.
+                           483     ; Shared Variables:  None.
+                           484     ; Global Variables:  None.
+                           485     ;
+                           486     ; Input:             None.
+                           487     ; Output:            None.
+8086/87/88/186 MACRO ASSEMBLER    EHDEMO                                                   00:07:52  11/11/;3  PAGE   10
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           488     ;
+                           489     ; Error Handling:    None.
+                           490     ;
+                           491     ; Algorithms:        None.
+                           492     ; Data Structures:   None.
+                           493     ;
+                           494     ; Registers Changed: flags, AX, ES
+                           495     ; Stack Depth:       0 words
+                           496     ;
+                           497     ; Author:            Glen George
+                           498     ; Last Modified:     Jan. 28, 2002
+                           499     
+00B2                       500     InstallHandler  PROC    NEAR
+                           501     
+                           502     
+00B2 33C0                  503             XOR     AX, AX          ;clear ES (interrupt vectors are in segment 0)
+00B4 8EC0                  504             MOV     ES, AX
+                           505                                     ;store the vector
+00B6 26C70620002A00 R      506             MOV     ES: WORD PTR (4 * Tmr0Vec), OFFSET(TimerEventHandler)
+00BD 26C7062200---- R      507             MOV     ES: WORD PTR (4 * Tmr0Vec + 2), SEG(TimerEventHandler)
+                           508     
+                           509     
+00C4 C3                    510             RET                     ;all done, return
+                           511     
+                           512     
+                           513     InstallHandler  ENDP
+                           514     
+                           515     
+                           516     
+                           517     
+                           518     ; ClrIRQVectors
+                           519     ;
+                           520     ; Description:      This functions installs the IllegalEventHandler for all
+                           521     ;                   interrupt vectors in the interrupt vector table.  Note
+                           522     ;                   that all 256 vectors are initialized so the code must be
+                           523     ;                   located above 400H.  The initialization skips  (does not
+                           524     ;                   initialize vectors) from vectors FIRST_RESERVED_VEC to
+                           525     ;                   LAST_RESERVED_VEC.
+                           526     ;
+                           527     ; Arguments:        None.
+                           528     ; Return Value:     None.
+                           529     ;
+                           530     ; Local Variables:  CX    - vector counter.
+                           531     ;                   ES:SI - pointer to vector table.
+                           532     ; Shared Variables: None.
+                           533     ; Global Variables: None.
+                           534     ;
+                           535     ; Input:            None.
+                           536     ; Output:           None.
+                           537     ;
+                           538     ; Error Handling:   None.
+                           539     ;
+                           540     ; Algorithms:       None.
+                           541     ; Data Structures:  None.
+                           542     ;
+8086/87/88/186 MACRO ASSEMBLER    EHDEMO                                                   00:07:52  11/11/;3  PAGE   11
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           543     ; Registers Used:   flags, AX, CX, SI, ES
+                           544     ; Stack Depth:      1 word
+                           545     ;
+                           546     ; Author:           Glen George
+                           547     ; Last Modified:    Feb. 8, 2002
+                           548     
+00C5                       549     ClrIRQVectors   PROC    NEAR
+                           550     
+                           551     
+00C5                       552     InitClrVectorLoop:              ;setup to store the same handler 256 times
+                           553     
+00C5 33C0                  554             XOR     AX, AX          ;clear ES (interrupt vectors are in segment 0)
+00C7 8EC0                  555             MOV     ES, AX
+00C9 BE0000                556             MOV     SI, 0           ;initialize SI to skip RESERVED_VECS (4 bytes each)
+                           557     
+00CC B90001                558             MOV     CX, 256         ;up to 256 vectors to initialize
+                           559     
+                           560     
+00CF                       561     ClrVectorLoop:                  ;loop clearing each vector
+                           562                                     ;check if should store the vector
+00CF 83FE04                563             CMP     SI, 4 * FIRST_RESERVED_VEC
+00D2 7205                  564             JB      DoStore         ;if before start of reserved field - store it
+00D4 83FE0C                565             CMP     SI, 4 * LAST_RESERVED_VEC
+00D7 760B                  566             JBE     DoneStore       ;if in the reserved vectors - don't store it
+                           567             ;JA     DoStore         ;otherwise past them - so do the store
+                           568     
+00D9                       569     DoStore:                        ;store the vector
+00D9 26C704EA00     R      570             MOV     ES: WORD PTR [SI], OFFSET(IllegalEventHandler)
+00DE 26C74402----   R      571             MOV     ES: WORD PTR [SI + 2], SEG(IllegalEventHandler)
+                           572     
+00E4                       573     DoneStore:                      ;done storing the vector
+00E4 83C604                574             ADD     SI, 4           ;update pointer to next vector
+                           575     
+00E7 E2E6                  576             LOOP    ClrVectorLoop   ;loop until have cleared all vectors
+                           577             ;JMP    EndClrIRQVectors;and all done
+                           578     
+                           579     
+00E9                       580     EndClrIRQVectors:               ;all done, return
+00E9 C3                    581             RET
+                           582     
+                           583     
+                           584     ClrIRQVectors   ENDP
+                           585     
+                           586     
+                           587     
+                           588     
+                           589     ; IllegalEventHandler
+                           590     ;
+                           591     ; Description:       This procedure is the event handler for illegal
+                           592     ;                    (uninitialized) interrupts.  It does nothing - it just
+                           593     ;                    returns after sending a non-specific EOI.
+                           594     ;
+                           595     ; Operation:         Send a non-specific EOI and return.
+                           596     ;
+                           597     ; Arguments:         None.
+8086/87/88/186 MACRO ASSEMBLER    EHDEMO                                                   00:07:52  11/11/;3  PAGE   12
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           598     ; Return Value:      None.
+                           599     ;
+                           600     ; Local Variables:   None.
+                           601     ; Shared Variables:  None.
+                           602     ; Global Variables:  None.
+                           603     ;
+                           604     ; Input:             None.
+                           605     ; Output:            None.
+                           606     ;
+                           607     ; Error Handling:    None.
+                           608     ;
+                           609     ; Algorithms:        None.
+                           610     ; Data Structures:   None.
+                           611     ;
+                           612     ; Registers Changed: None
+                           613     ; Stack Depth:       2 words
+                           614     ;
+                           615     ; Author:            Glen George
+                           616     ; Last Modified:     Dec. 25, 2000
+                           617     
+00EA                       618     IllegalEventHandler     PROC    NEAR
+                           619     
+00EA 90                    620             NOP                             ;do nothing (can set breakpoint here)
+                           621     
+00EB 50                    622             PUSH    AX                      ;save the registers
+00EC 52                    623             PUSH    DX
+                           624     
+00ED BA22FF                625             MOV     DX, INTCtrlrEOI         ;send a non-sepecific EOI to the
+00F0 B80080                626             MOV     AX, NonSpecEOI          ;   interrupt controller to clear out
+00F3 EE                    627             OUT     DX, AL                  ;   the interrupt that got us here
+                           628     
+00F4 5A                    629             POP     DX                      ;restore the registers
+00F5 58                    630             POP     AX
+                           631     
+00F6 CF                    632             IRET                            ;and return
+                           633     
+                           634     
+                           635     IllegalEventHandler     ENDP
+                           636     
+                           637     
+                           638     
+                           639     
+                           640     ; SegPatTable
+                           641     ;
+                           642     ; Description:      This is the segment pattern table.  It contains all the
+                           643     ;                   patterns to be output to the display.
+                           644     ;
+                           645     ; Notes:            READ ONLY tables should always be in the code segment so
+                           646     ;                   that in a standalone system they will be located in the
+                           647     ;                   ROM with the code.
+                           648     ;
+                           649     ; Author:           Glen George
+                           650     ; Last Modified:    Dec. 26, 1999
+                           651     
+00F7                       652     SegPatTable     LABEL   BYTE
+8086/87/88/186 MACRO ASSEMBLER    EHDEMO                                                   00:07:52  11/11/;3  PAGE   13
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           653     
+                           654     ;               .gfedcba
+00F7 01                    655             DB      00000001B
+00F8 02                    656             DB      00000010B
+00F9 40                    657             DB      01000000B
+00FA 10                    658             DB      00010000B
+00FB 08                    659             DB      00001000B
+00FC 04                    660             DB      00000100B
+00FD 40                    661             DB      01000000B
+00FE 20                    662             DB      00100000B
+00FF 01                    663             DB      00000001B
+                           664     
+  0009                     665     NO_SEG_PAT      EQU     $ - SegPatTable         ;automatically gets the table size
+                           666     
+                           667     
+                           668     
+----                       669     PROGRAM ENDS
+                           670     
+                           671     
+                           672     
+                           673     
+                           674     ;the data segment
+                           675     
+----                       676     DATA    SEGMENT PUBLIC  'DATA'
+                           677     
+0000 ????                  678     Digit           DW      ?               ;the current digit number
+0002 ??                    679     Segmnt          DB      ?               ;the current segment pattern number
+                           680     
+----                       681     DATA    ENDS
+                           682     
+                           683     
+                           684     
+                           685     
+                           686     ;the stack
+                           687     
+----                       688     STACK           SEGMENT STACK  'STACK'
+                           689     
+0000 (80                   690                     DB      80 DUP ('Stack ')       ;240 words
+     537461636B20
+     )
+                           691     
+01E0                       692     TopOfStack      LABEL   WORD
+                           693     
+----                       694     STACK           ENDS
+                           695     
+                           696     
+                           697     
+                           698             END     START
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

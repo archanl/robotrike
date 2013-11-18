@@ -1,0 +1,504 @@
+8086/87/88/186 MACRO ASSEMBLER    DISPLAY                                                  07:16:43  11/18/;3  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE DISPLAY
+OBJECT MODULE PLACED IN DISPLAY.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE DISPLAY.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1         NAME DISPLAY
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                                    DISPLAY                                 ;
+                             6     ;                               Display Routines                             ;
+                             7     ;                                   EE/CS 51                                 ;
+                             8     ;                                 Archan Luhar                               ;
+                             9     ;                                 TA: Joe Greef                              ;
+                            10     ;                                                                            ;
+                            11     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                            12     
+                            13     ; This file contains functions to intialize and write to the display of the
+                            14     ; target board.
+                            15     ;
+                            16     ; The included public functions are:
+                            17     ;   - DisplayInit
+                            18     ;           Calls necessary chip select, interrupt, and timer initialization
+                            19     ;   - DisplayTimerEventHandler
+                            20     ;           Updates the display, iterating over the display buffer
+                            21     ;   - Display
+                            22     ;           Given an ascii string argument, writes to pattern to display buffer
+                            23     ;   - DisplayNum
+                            24     ;           Given a number , writes its decimal representation to display buffer
+                            25     ;   - DisplayHex
+                            26     ;           Given a number, writes its hexadecimal representation to buffer
+                            27     ;
+                            28     ; Revision History:
+                            29     ;       11/12/2013      Archan Luhar    Finished debugging.
+                            30     ;       11/18/2013      Archan Luhar    Finished documentation.
+                            31     
+                            32 +1  $INCLUDE(general.inc)
+                      =1    33     ; General Definitions
+  0000                =1    34     ASCII_NULL      EQU     0
+  0002                =1    35     BYTES_IN_WORD   EQU     2
+  0008                =1    36     BYTE_BITS       EQU     8               ; Number of bits in a byte
+                            37 +1  $INCLUDE(display.inc)
+                      =1    38     ; Display Definitions
+  0000                =1    39     LEDDisplay      EQU     0000H           ; Address of first display
+  0008                =1    40     LEDDisplay14    EQU     0008H           ; High byte address for for 14 segments
+  0008                =1    41     NUM_DIGITS      EQU     8               ; Number of displays/digits
+  0000                =1    42     BLANK_DISPLAY   EQU     0               ; Clear display code
+                            43     
+                            44     
+                            45     CGROUP  GROUP   CODE
+                            46     DGROUP  GROUP   DATA
+----                        47     CODE    SEGMENT PUBLIC 'CODE'
+                            48             ASSUME  CS:CGROUP, DS:DGROUP, ES:NOTHING, SS:DGROUP
+                            49     
+                            50     ; External references
+8086/87/88/186 MACRO ASSEMBLER    DISPLAY                                                  07:16:43  11/18/;3  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                            51         EXTRN   InitDisplayCS:NEAR
+                            52         EXTRN   SetDisplayTimerEventHandler:NEAR
+                            53         EXTRN   SetDisplayTimerInterrupt:NEAR
+                            54         EXTRN   Dec2String:NEAR
+                            55         EXTRN   Hex2String:NEAR
+                            56         EXTRN   ASCIISegTable:NEAR
+                            57     
+                            58     
+                            59     
+                            60     ; DisplayInit
+                            61     ;
+                            62     ; Description:      This function calls several functions to initialize
+                            63     ;                   the chip selects, timer event handlers, and install the
+                            64     ;                   timer interrupts so that the program can use the target
+                            65     ;                   board display to display any ascii string just by calling
+                            66     ;                   Display.
+                            67     ;
+                            68     ; Operation:        Calls chip select initialization function.
+                            69     ;                   Calls function to install the event handler.
+                            70     ;                   Calls function to set up the timer interrupts.
+                            71     ;
+                            72     ; Arguments:        None.
+                            73     ;
+                            74     ; Return Value:     None.
+                            75     ;
+                            76     ; Local Variables:  None.
+                            77     ;
+                            78     ; Shared Variables: None.
+                            79     ;
+                            80     ; Global Variables: None.
+                            81     ;
+                            82     ; Input:            None.
+                            83     ;
+                            84     ; Output:           None.
+                            85     ;
+                            86     ; Error Handling:   None.
+                            87     ;
+                            88     ; Algorithms:       None.
+                            89     ;
+                            90     ; Data Structures:  None.
+                            91     ;
+                            92     ; Registers Used:   None.
+                            93     ;
+                            94     ; Stack Depth:      0.
+                            95     ;
+                            96     ; Author:           Archan Luhar
+                            97     ; Last Modified:    11/18/2013
+                            98     
+0000                        99     DisplayInit    PROC    NEAR
+                           100                    PUBLIC  DisplayInit
+                           101     
+0000 E80000         E      102         CALL InitDisplayCS                  ; Initialize chip selects
+0003 E80000         E      103         CALL SetDisplayTimerEventHandler    ; Install the display event handler
+0006 E80000         E      104         CALL SetDisplayTimerInterrupt       ; Setup timer interrupt registers
+0009 C3                    105         RET
+8086/87/88/186 MACRO ASSEMBLER    DISPLAY                                                  07:16:43  11/18/;3  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           106     
+                           107     DisplayInit ENDP
+                           108     
+                           109     
+                           110     ; DisplayTimerEventHandler
+                           111     ;
+                           112     ; Description:      This function should be called on timer interrupt to output
+                           113     ;                   the display buffer onto the physical display.
+                           114     ;
+                           115     ; Operation:        At each call, this function reads the pattern for one of
+                           116     ;                   the displays indexed by the shared variable display_index
+                           117     ;                   and outputs the pattern to the corresponding display.
+                           118     ;                   It then increments the display_index and wraps it around
+                           119     ;                   to 0 so that the index cycles from 0 to NUM_DIGITS - 1.
+                           120     ;
+                           121     ; Arguments:        None.
+                           122     ;
+                           123     ; Return Value:     None.
+                           124     ;
+                           125     ; Local Variables:  None.
+                           126     ;
+                           127     ; Shared Variables: display_buffer
+                           128     ;                   display_index
+                           129     ;
+                           130     ; Global Variables: None.
+                           131     ;
+                           132     ; Input:            None.
+                           133     ;
+                           134     ; Output:           Display.
+                           135     ;
+                           136     ; Error Handling:   None.
+                           137     ;
+                           138     ; Algorithms:       None.
+                           139     ;
+                           140     ; Data Structures:  None.
+                           141     ;
+                           142     ; Registers Used:   None.
+                           143     ;
+                           144     ; Stack Depth:      4 words: 4 registers pushed.
+                           145     ;
+                           146     ; Author:           Archan Luhar
+                           147     ; Last Modified:    11/18/2013
+                           148     
+000A                       149     DisplayTimerEventHandler    PROC    NEAR
+                           150                                 PUBLIC  DisplayTimerEventHandler
+000A                       151         DisplayTimerEventHandlerInit:
+000A 50                    152             PUSH AX                             ; Save registers
+000B 53                    153             PUSH BX
+000C 52                    154             PUSH DX
+000D 56                    155             PUSH SI
+                           156     
+000E BB000090       R      157             MOV BX, OFFSET(display_buffer)      ; Get display buffer address
+0012 8B361200       R      158             MOV SI, display_index               ; SI = display index
+                           159     
+0016 D1E6                  160             SHL SI, 1                           ; SI = buffer offset = SI * 2
+8086/87/88/186 MACRO ASSEMBLER    DISPLAY                                                  07:16:43  11/18/;3  PAGE    4
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           161                                                 ; (BYTES_IN_WORD = 
+                           162                                                 ;  2 bytes per buffer word)
+                           163     
+0018 8B00                  164             MOV AX, [BX][SI]                    ; AX = character pattern
+001A 86E0                  165             XCHG AH, AL                         ; AL = 14 segment modifier pattern
+                           166                                                 ; AH = display pattern
+                           167     
+001C D1EE                  168             SHR SI, 1                           ; SI = display index
+                           169     
+001E                       170         DisplayUpdate:
+001E BA0800                171             MOV DX, LEDDisplay14                ; Set the 14 segment modifier
+0021 EE                    172             OUT DX, AL
+                           173     
+                           174                                                 ; AX = pattern . modifier
+0022 C1E808                175             SHR AX, BYTE_BITS                   ; AX =       0 . pattern
+                           176                                                 ;                AL = pattern
+                           177             
+0025 BA0000                178             MOV DX, LEDDisplay                  ; Set the current LED display
+0028 03D6                  179             ADD DX, SI                          ; Make sure to offset by the index
+002A EE                    180             OUT DX, AL
+                           181     
+                           182     
+002B                       183         DisplayIndexUpdate:
+002B 46                    184             INC SI                              ; Increment the display index
+002C 83FE08                185             CMP SI, NUM_DIGITS                  ; If not reached max,
+002F 7203                  186             JB  SkipDisplayIndexWrap            ; don't wrap around.
+                           187     
+0031                       188         DisplayIndexWrap:
+0031 BE0000                189             MOV SI, 0                           ; Else, wrap the digit index back to
+                           190                                                 ; 0.
+                           191     
+0034                       192         SkipDisplayIndexWrap:
+0034                       193         EndDisplayTimerEventHandler:
+0034 89361200       R      194             MOV display_index, SI               ; Update the shared variable
+                           195                                                 ; display_index =
+                           196                                                 ;   display_index + 1 mod NUM_DIGITS
+                           197     
+0038 5E                    198             POP SI                              ; Restore registers
+0039 5A                    199             POP DX
+003A 5B                    200             POP BX
+003B 58                    201             POP AX
+003C C3                    202             RET
+                           203     
+                           204     DisplayTimerEventHandler ENDP
+                           205     
+                           206     ; Display
+                           207     ;
+                           208     ; Description:      This function is used to display a <null> terminated string
+                           209     ;                   to the LED display on the target board. The function does
+                           210     ;                   not actually output to the display. It just writes to a
+                           211     ;                   buffer which is read by DisplayTimerEventHandler.
+                           212     ;
+                           213     ; Operation:        This function goes through each character of the string
+                           214     ;                   located at ES:SI and writing to the buffer the segment
+                           215     ;                   pattern corresponding to the character. A table stored in
+8086/87/88/186 MACRO ASSEMBLER    DISPLAY                                                  07:16:43  11/18/;3  PAGE    5
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           216     ;                   CS is used. The table's nth word corresponds to the pattern
+                           217     ;                   for the nth ascii character.
+                           218     ;
+                           219     ; Arguments:        SI - the offset from ES which is the location of the the
+                           220     ;                   string.
+                           221     ;
+                           222     ; Return Value:     None.
+                           223     ;
+                           224     ; Local Variables:  DX = pointer to segment pattern table
+                           225     ;                   DI = pointer to display buffer
+                           226     ;                   CX = end condition for DI
+                           227     ;                   BL = character loaded from argument
+                           228     ;                   BX = offset into pattern table
+                           229     ;
+                           230     ; Shared Variables: display_buffer - a portion of the memory dedicated to
+                           231     ;                                    storing the exact representation of the
+                           232     ;                                    currently displayed characters. The display
+                           233     ;                                    timer event handler will display what is in
+                           234     ;                                    buffer location.
+                           235     ;
+                           236     ; Global Variables: None.
+                           237     ;
+                           238     ; Input:            None.
+                           239     ; Output:           None.
+                           240     ;
+                           241     ; Error Handling:   None.
+                           242     ;
+                           243     ; Algorithms:       None.
+                           244     ;
+                           245     ; Data Structures:  Array.
+                           246     ;
+                           247     ; Registers Used:   None.
+                           248     ;
+                           249     ; Stack Depth:      6 words.
+                           250     ;
+                           251     ; Author:           Archan Luhar
+                           252     ; Last Modified:    11/18/2013
+                           253     
+003D                       254     Display     PROC    NEAR
+                           255                 PUBLIC  Display
+                           256     
+003D 50                    257         PUSH AX                             ; Save Registers
+003E 53                    258         PUSH BX
+003F 51                    259         PUSH CX
+0040 52                    260         PUSH DX
+0041 56                    261         PUSH SI
+0042 57                    262         PUSH DI
+                           263     
+                           264         ; DX = offset into CS to segment pattern table
+0043 BA0000         E      265         MOV DX, OFFSET(ASCIISegTable)
+                           266     
+                           267         ; DI = offset into DS to buffer of an LED display
+0046 BF000090       R      268         MOV DI, OFFSET(display_buffer)
+                           269     
+                           270         ; CX = loop end condition = past buffers of all digits, each buffer 2 bytes
+8086/87/88/186 MACRO ASSEMBLER    DISPLAY                                                  07:16:43  11/18/;3  PAGE    6
+
+
+LOC  OBJ                  LINE     SOURCE
+
+004A B9100090       R      271         MOV CX, OFFSET(display_buffer) + (NUM_DIGITS * BYTES_IN_WORD)
+                           272     
+004E                       273         SetBufferLoop:
+004E 268A1C                274             MOV BL, ES:BYTE PTR [SI]        ; BL = argument[0]
+0051 80FB00                275             CMP BL, ASCII_NULL              ; If character is ASCII NULL,
+0054 7401                  276             JE SkipStringIndexIncrement     ; don't increase string index
+                           277     
+0056                       278         IncrementStringIndex:
+0056 46                    279             INC SI                          ; If character is not null, get string
+                           280                                             ; index ready for loop back
+0057                       281         SkipStringIndexIncrement:
+0057                       282         WriteChar:
+0057 32FF                  283             XOR BH, BH                      ; BH = 0
+0059 D1E3                  284             SHL BX, 1                       ; BX = 2 * ascii value of character
+                           285                                             ; BX = pattern offset
+                           286                                             ; (each segment pattern is 1 word
+                           287                                             ;  whereas each character is 1 byte)
+                           288     
+005B 03DA                  289             ADD BX, DX                      ; BX = pattern offset + table offset
+005D 2E8B07                290             MOV AX, CS:[BX]                 ; AX = segment pattern
+                           291     
+0060 8905                  292             MOV [DI], AX                    ; DS:[display_buffer pointer] = pattern
+                           293     
+0062                       294         EndBufferLoop:
+0062 83C702                295             ADD DI, BYTES_IN_WORD           ; Increment display buffer pointer by 1
+                           296                                             ; word because each pattern is a word.
+0065 3BF9                  297             CMP DI, CX                      ; If buffer pointer is not past all the
+0067 75E5                  298             JNE SetBufferLoop               ; buffers, then loop. Else, end Display.
+                           299     
+0069                       300         EndDisplay:
+0069 5F                    301             POP DI                          ; Restore registers and return
+006A 5E                    302             POP SI
+006B 5A                    303             POP DX
+006C 59                    304             POP CX
+006D 5B                    305             POP BX
+006E 58                    306             POP AX
+006F C3                    307             RET
+                           308     
+                           309     Display ENDP
+                           310     
+                           311     
+                           312     
+                           313     ; DisplayNum
+                           314     ;
+                           315     ; Description:      This function is used to display a decimal number to
+                           316     ;                   the LED display.
+                           317     ;
+                           318     ; Operation:        This function simply calls Dec2String to get the ASCII
+                           319     ;                   representation of the number and then calls Display
+                           320     ;                   to display the ascii representation of the number.
+                           321     ;                   Dec2String writes to DS:SI (display_ascii) which is passed
+                           322     ;                   to Display as ES:SI.
+                           323     ;
+                           324     ; Arguments:        AX - number to display.
+                           325     ;
+8086/87/88/186 MACRO ASSEMBLER    DISPLAY                                                  07:16:43  11/18/;3  PAGE    7
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           326     ; Return Value:     None.
+                           327     ;
+                           328     ; Local Variables:  ES = DS
+                           329     ;                   SI = offset into DS of display_ascii
+                           330     ;
+                           331     ; Shared Variables: display_ascii
+                           332     ; Global Variables: None.
+                           333     ;
+                           334     ; Input:            None.
+                           335     ; Output:           None.
+                           336     ;
+                           337     ; Error Handling:   None.
+                           338     ;
+                           339     ; Algorithms:       None.
+                           340     ;
+                           341     ; Data Structures:  None.
+                           342     ;
+                           343     ; Registers Used:   None.
+                           344     ;
+                           345     ; Stack Depth:      3 words: 2 registers and a call to a NEAR function.
+                           346     ;
+                           347     ; Author:           Archan Luhar
+                           348     ; Last Modified:    11/18/2013
+                           349     
+0070                       350     DisplayNum  PROC    NEAR
+                           351                 PUBLIC  DisplayNum
+                           352     
+0070 06                    353         PUSH ES                             ; Save registers
+0071 53                    354         PUSH BX
+                           355         
+0072 8CDB                  356         MOV BX, DS                          ; Since DS = SEG(display_offset)
+0074 8EC3                  357         MOV ES, BX                          ; Setup to write ASCII to DS:SI
+0076 BE140090       R      358         MOV SI, OFFSET(display_ascii)       ; And to read ASCII from ES:SI
+                           359     
+007A E80000         E      360         CALL Dec2String                     ; Argument is AX, writes to DS:SI
+007D E8BDFF                361         CALL Display                        ; Argument string read from ES:SI.
+                           362         
+0080 5B                    363         POP BX                              ; Restore registers
+0081 07                    364         POP ES
+                           365         
+0082 C3                    366         RET
+                           367     
+                           368     DisplayNum ENDP
+                           369     
+                           370     
+                           371     ; DisplayHex
+                           372     ;
+                           373     ; Description:      This function is used to display a hexadecimal number to
+                           374     ;                   the LED display.
+                           375     ;
+                           376     ; Operation:        This function simply calls Hex2String to get the ASCII
+                           377     ;                   representation of the number and then call Display
+                           378     ;                   to display the ascii representation of the number.
+                           379     ;                   Dec2String writes to DS:SI (display_ascii) which is passed
+                           380     ;                   to Display as ES:SI.
+8086/87/88/186 MACRO ASSEMBLER    DISPLAY                                                  07:16:43  11/18/;3  PAGE    8
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           381     ;
+                           382     ; Arguments:        AX - number to display.
+                           383     ;
+                           384     ; Return Value:     None.
+                           385     ;
+                           386     ; Local Variables:  ES = DS
+                           387     ;                   SI = offset into DS of display_ascii
+                           388     ;
+                           389     ; Shared Variables: display_ascii
+                           390     ; Global Variables: None.
+                           391     ;
+                           392     ; Input:            None.
+                           393     ; Output:           None.
+                           394     ;
+                           395     ; Error Handling:   None.
+                           396     ;
+                           397     ; Algorithms:       None.
+                           398     ;
+                           399     ; Data Structures:  None.
+                           400     ;
+                           401     ; Registers Used:   None.
+                           402     ;
+                           403     ; Stack Depth:      3 words: 2 registers and a call to a NEAR function.
+                           404     ;
+                           405     ; Author:           Archan Luhar
+                           406     ; Last Modified:    11/18/2013
+                           407     
+0083                       408     DisplayHex  PROC    NEAR
+                           409                 PUBLIC  DisplayHex
+                           410     
+0083 06                    411         PUSH ES                             ; Save registers
+0084 53                    412         PUSH BX
+                           413         
+0085 8CDB                  414         MOV BX, DS                          ; Since DS = SEG(display_offset)
+0087 8EC3                  415         MOV ES, BX                          ; Setup to write ASCII to DS:SI
+0089 BE140090       R      416         MOV SI, OFFSET(display_ascii)       ; And to read ASCII from ES:SI
+                           417     
+008D E80000         E      418         CALL Hex2String                     ; Argument is AX, writes to DS:SI
+0090 E8AAFF                419         CALL Display                        ; Argument string read from ES:SI.
+                           420         
+0093 5B                    421         POP BX                              ; Restore registers
+0094 07                    422         POP ES
+                           423         
+0095 C3                    424         RET
+                           425     
+                           426     DisplayHex ENDP
+                           427     
+                           428     
+----                       429     CODE ENDS
+                           430     
+                           431     
+----                       432     DATA SEGMENT PUBLIC 'DATA'
+                           433     
+                           434         ; Stores the representation of the current display
+0000 (9                    435         display_buffer DW   9   DUP (BLANK_DISPLAY)
+8086/87/88/186 MACRO ASSEMBLER    DISPLAY                                                  07:16:43  11/18/;3  PAGE    9
+
+
+LOC  OBJ                  LINE     SOURCE
+
+     0000
+     )
+                           436         
+                           437         ; The timer handler keeps track of which display to OUTput to next
+0012 (1                    438         display_index  DW   1   DUP (0)
+     0000
+     )
+                           439         
+                           440         ; A space allocated to read/write temporary ascii strings for the display
+0014 (9                    441         display_ascii  DB   9   DUP (BLANK_DISPLAY)
+     00
+     )
+                           442     
+----                       443     DATA ENDS
+                           444     
+                           445     
+                           446         END
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

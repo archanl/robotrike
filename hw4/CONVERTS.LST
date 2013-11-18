@@ -1,0 +1,294 @@
+8086/87/88/186 MACRO ASSEMBLER    CONVERTS                                                 07:16:45  11/18/;3  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE CONVERTS
+OBJECT MODULE PLACED IN CONVERTS.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE CONVERTS.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1         NAME    CONVERTS
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                                   CONVERTS                                 ;
+                             6     ;                             Conversion Functions                           ;
+                             7     ;                                   EE/CS 51                                 ;
+                             8     ;                                 Archan Luhar                               ;
+                             9     ;                                 TA: Joe Greef                              ;
+                            10     ;                                                                            ;
+                            11     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                            12     
+                            13 +1  $INCLUDE(general.inc)
+                      =1    14     ; General Definitions
+  0000                =1    15     ASCII_NULL      EQU     0
+  0002                =1    16     BYTES_IN_WORD   EQU     2
+  0008                =1    17     BYTE_BITS       EQU     8               ; Number of bits in a byte
+                            18     
+                            19     ; 
+                            20     ;
+                            21     ; Revision History:
+                            22     ;     1/26/06  Glen George      initial revision
+                            23     ;    10/26/13  Archan Luhar     Finished Homework 2
+                            24     ;    11/18/13  Archan Luhar     Cleaned up formatting
+                            25     
+                            26     
+                            27     CGROUP  GROUP   CODE
+----                        28     CODE    SEGMENT PUBLIC 'CODE'
+                            29             ASSUME  CS:CGROUP
+                            30     
+                            31     
+                            32     
+                            33     ; Dec2String
+                            34     ;
+                            35     ; Description:      This function is used to create a decimal ascii string
+                            36     ;                   given a signed binary value.
+                            37     ;
+                            38     ; Operation:        Given a 16 bit signed value, the function writes to
+                            39     ;                   specified memory location the ascii string representing the
+                            40     ;                   number in base 10 by looping over the number to find
+                            41     ;                   the ones, tens, etc. digits. The maximum number of digits
+                            42     ;                   is 5. The maximum number of bytes that can be written, thus,
+                            43     ;                   are 7 (+1 '-' if negative, and +1 NULL ending character).
+                            44     ;
+                            45     ; Arguments:        AX - the signed 16 bit value.
+                            46     ;                   SI - the location to write the string.
+                            47     ;
+                            48     ; Return Value:     Resulting hexadecimal representation ASCII string is written
+                            49     ;                   at SI.
+                            50     ;
+8086/87/88/186 MACRO ASSEMBLER    CONVERTS                                                 07:16:45  11/18/;3  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                            51     ; Local Variables:  Argument or Digit (AX)
+                            52     ;                   Temporary location for remainder to be next argument (BX)
+                            53     ;                   Remainder (DX)
+                            54     ;                   pwr10 (CX)
+                            55     ;                   nextChar (SI)
+                            56     ;
+                            57     ; Shared Variables: None.
+                            58     ; Global Variables: None.
+                            59     ;
+                            60     ; Input:            None.
+                            61     ; Output:           None.
+                            62     ;
+                            63     ; Error Handling:   None.
+                            64     ;
+                            65     ; Algorithms:       Repeatedly divide by powers of 10 and get the remainders
+                            66     ;                   which are the digits.
+                            67     ;
+                            68     ; Data Structures:  None.
+                            69     ;
+                            70     ; Registers Used:   AX, BX, CX, DX, SI
+                            71     ;
+                            72     ; Stack Depth:      8 words (pushed all general purpose registers)
+                            73     ;
+                            74     ; Author:           Archan Luhar
+                            75     ; Last Modified:    10/26/2013
+                            76     
+0000                        77     Dec2String      PROC        NEAR
+                            78                     PUBLIC      Dec2String
+                            79     
+0000                        80     InitDec2String:
+0000 60                     81         PUSHA                           ; Save all general purpose registers
+                            82     
+0001                        83     CheckZero:
+0001 3D0000                 84         CMP AX, 0                       ; If argument number is zero, skip
+0004 7449                   85         JZ WriteZero                    ; following and write zero.
+                            86     
+0006                        87     CheckNegative:                      ; If number is negative, write ASCII dash.
+0006 7D06                   88         JNL SetupPower10
+0008 C6042D                 89         MOV BYTE PTR [SI], '-'
+000B 46                     90         INC SI
+000C F7D8                   91         NEG AX                          ; Make the number positive.
+                            92     
+000E                        93     SetupPower10:                       ; pwr10 = 10000
+000E B91027                 94         MOV CX, 10000
+                            95     
+0011                        96     FindFirstPwr10Loop:
+0011 BA0000                 97         MOV DX, 0                       ; Clear DX for 16 bit division
+0014 F7F1                   98         DIV CX                          ; digit = AX = n / pwr10.
+                            99                                         ; remainder = DX = n mod pwr10
+                           100     
+0016 3D0000                101         CMP AX, 0                       ; If digit is not zero, nonzero digit found!
+0019 7517                  102         JNZ WriteDigit                  ; If found, go write this and all next.
+                           103     
+001B 8BDA                  104         MOV BX, DX                      ; Save next argument n mod pwr 10 in BX
+                           105     
+8086/87/88/186 MACRO ASSEMBLER    CONVERTS                                                 07:16:45  11/18/;3  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+001D 8BC1                  106         MOV AX, CX                      ; Setup AX for dividing pwr10 by 10
+001F B90A00                107         MOV CX, 10
+0022 BA0000                108         MOV DX, 0
+0025 F7F1                  109         DIV CX
+                           110     
+0027 8BC8                  111         MOV CX, AX                      ; Move pwr10 / 10 back to CX
+0029 8BC3                  112         MOV AX, BX                      ; move next (n mod pwr10) back to AX
+                           113     
+002B EBE4                  114         JMP FindFirstPwr10Loop
+                           115     
+                           116     
+002D                       117     WriteDigitsLoop:
+002D BA0000                118         MOV DX, 0
+0030 F7F1                  119         DIV CX                      ; Divide number by power of ten
+                           120     
+0032                       121     WriteDigit:
+0032 053000                122         ADD AX, '0'                 ; Make digit into ASCII character
+0035 8804                  123         MOV BYTE PTR [SI], AL                ; Write the character
+0037 46                    124         INC SI                      ; Increment the string pointer to next byte
+                           125     
+0038                       126     MoveToNextPwr:
+0038 8BDA                  127         MOV BX, DX                  ; Save arg mod pwr10 from being overwritten by
+                           128                                     ; next instructions that produce the next power
+                           129     
+003A 8BC1                  130         MOV AX, CX                  ; Setup pwr10 for divison
+003C B90A00                131         MOV CX, 10
+003F BA0000                132         MOV DX, 0
+0042 F7F1                  133         DIV CX
+0044 3D0000                134         CMP AX, 0
+0047 740A                  135         JZ EndDec2String
+0049 8BC8                  136         MOV CX, AX                  ; pwr10 = pwr10 / 10
+                           137     
+004B 8BC3                  138         MOV AX, BX                  ; Restore arg mod pwr10 to AX
+                           139     
+004D                       140     EndWriteDigitsLoop:
+004D EBDE                  141         JMP WriteDigitsLoop
+                           142     
+                           143     
+004F                       144     WriteZero:
+004F C60430                145         MOV BYTE PTR [SI], '0'      ; Skipped digit writing code to write zero
+0052 46                    146         INC SI                      ; and continue to end the string.
+                           147         
+0053                       148     EndDec2String:                  ; End string with ASCII NULL
+0053 C60400                149         MOV BYTE PTR [SI], ASCII_NULL
+0056 61                    150         POPA                        ; Restore general purpose registers and return
+0057 C3                    151             RET
+                           152     
+                           153     Dec2String      ENDP
+                           154     
+                           155     
+                           156     
+                           157     
+                           158     ; Hex2String
+                           159     ;
+                           160     ; Description:      This function is used to create a hexadecimal ascii string
+8086/87/88/186 MACRO ASSEMBLER    CONVERTS                                                 07:16:45  11/18/;3  PAGE    4
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           161     ;                   given an unsigned binary value.
+                           162     ;
+                           163     ; Operation:        Given a 16 bit unsigned value, hexadecimal ascii characters
+                           164     ;                   are written to a specified memory location by going through
+                           165     ;                   each 4 bit quarter of the binary representation via a
+                           166     ;                   incrementally shifting and masking.
+                           167     ;
+                           168     ; Arguments:        AX - the unsigned 16 bit value.
+                           169     ;                   SI - the location to write the string.
+                           170     ;
+                           171     ; Return Value:     Resulting hexadecimal representation ASCII string is written
+                           172     ;                   at SI.
+                           173     ;
+                           174     ; Local Variables:  original value (AX)
+                           175     ;                   digit (BX)
+                           176     ;                   numRightZeroBits (CL)
+                           177     ;                   mask (DX)
+                           178     ;                   strPointer (SI)
+                           179     ;
+                           180     ; Shared Variables: None.
+                           181     ; Global Variables: None.
+                           182     ;
+                           183     ; Input:            None.
+                           184     ; Output:           None.
+                           185     ;
+                           186     ; Error Handling:   None.
+                           187     ;
+                           188     ; Algorithms:       None.
+                           189     ; Data Structures:  None.
+                           190     ;
+                           191     ; Registers Used:   AX, BX, CX, DX, SI
+                           192     ; Stack Depth:      8 words for saving all registers
+                           193     ;
+                           194     ; Author:           Archan Luhar
+                           195     ; Last Modified:    10/26/2013
+                           196     
+0058                       197     Hex2String      PROC        NEAR
+                           198                     PUBLIC      Hex2String
+0058                       199     InitHex2String:
+0058 60                    200         PUSHA                           ; Save all general purpose registers
+                           201     
+0059                       202     HexCheckZero:
+0059 3D0000                203         CMP AX, 0                       ; If input number is 0, skip everything
+005C 7438                  204         JZ WriteHexZero                 ; And write zero. Else continue.
+                           205     
+005E                       206     SetupMask:
+005E BA00F0                207         MOV DX, 0f000h                  ; Sets up mask to get highest four bits
+0061 B10C                  208         MOV CL, 12                      ; Sets up the number of 0 bits to the right
+                           209     
+0063                       210     FindFirstNonZeroLoop:               ; Loop until the first non zero digit is
+0063 85C2                  211         TEST AX, DX                     ; found.
+0065 7508                  212         JNZ WriteHexDigitsLoop          ; If so, move on to writing it.
+0067 C1EA04                213         SHR DX, 4                       ; If not, shift the mask
+006A 80C1FC                214         ADD CL, -4                      ; and correct the number of bits to right.
+006D EBF4                  215         JMP FindFirstNonZeroLoop
+8086/87/88/186 MACRO ASSEMBLER    CONVERTS                                                 07:16:45  11/18/;3  PAGE    5
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           216     
+                           217     
+006F                       218     WriteHexDigitsLoop:
+006F 8BD8                  219         MOV BX, AX                      ; Setup BX to store the digit
+0071 23DA                  220         AND BX, DX                      ; Get the digit by AND'ing the mask
+                           221     
+0073 D3EB                  222         SHR BX, CL                      ; Make sure digit has no trailing zeroes
+0075 C1EA04                223         SHR DX, 4                       ; Update the mask for the next digit.
+0078 80C1FC                224         ADD CL, -4                      ; And update the number of bits to the right
+                           225     
+007B                       226     DecideOffset:
+007B 83FB0A                227         CMP BX, 10                      ; If the digit is less than 10
+007E 7C09                  228         JL AddDigitOffset               ; add the ASCII digit offset.
+                           229     
+0080                       230     AddLetterOffset:                    ; Else, add the ASCII letter offset.
+0080 83C3F6                231         ADD BX, -10                     ; (A 10 corresponds to an 'A')
+0083 83C341                232         ADD BX, 'A'
+0086 EB0490                233         JMP WriteHexDigit               ; And write it.
+                           234     
+0089                       235     AddDigitOffset:
+0089 83C330                236         ADD BX, '0'                     ; Add the digit offset. Continue to write.
+                           237     
+008C                       238     WriteHexDigit:
+008C 881C                  239         MOV BYTE PTR [SI], BL           ; Write the character created from offseting
+008E 46                    240         INC SI                          ; Increment the string pointer to next byte
+                           241     
+008F                       242     EndWriteHexDigitsLoop:
+008F 83FA00                243         CMP DX, 0                       ; If mask is zero, no more digits left,
+0092 7406                  244         JZ EndHex2String                ; finish off the string and function.
+0094 EBD9                  245         JMP WriteHexDigitsLoop          ; Else, write next digit.
+                           246     
+                           247     
+0096                       248     WriteHexZero:
+0096 C60430                249         MOV BYTE PTR [SI], '0'          ; Skipped digit writing code to write zero
+0099 46                    250         INC SI                          ; and continue to end the string.
+                           251         
+009A                       252     EndHex2String:
+009A C60400                253         MOV BYTE PTR [SI], ASCII_NULL
+009D 61                    254         POPA                            ; Restore all general purpose registers
+009E C3                    255             RET
+                           256     
+                           257     Hex2String      ENDP
+                           258     
+                           259     
+                           260     
+----                       261     CODE ENDS
+                           262         END
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

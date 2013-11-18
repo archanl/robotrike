@@ -1,0 +1,106 @@
+8086/87/88/186 MACRO ASSEMBLER    HW4MAIN                                                  07:16:43  11/18/;3  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE HW4MAIN
+OBJECT MODULE PLACED IN HW4MAIN.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE HW4MAIN.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1         NAME    HW4MAIN
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                                   HW4MAIN                                  ;
+                             6     ;                             Homework 4 Main Loop                           ;
+                             7     ;                                  EE/CS 51                                  ;
+                             8     ;                                 Archan Luhar                               ;
+                             9     ;                                 TA: Joe Greef                              ;
+                            10     ;                                                                            ;
+                            11     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                            12     
+                            13     ; Description:      This program allocates space for shared variables needed
+                            14     ;                   for the display routines. It also calls all the
+                            15     ;                   initialization and test functions.
+                            16     ;
+                            17     ; Input:            None.
+                            18     ; Output:           Display.
+                            19     ;
+                            20     ; User Interface:   None.
+                            21     ;
+                            22     ; Error Handling:   None.
+                            23     ;
+                            24     ; Algorithms:       None.
+                            25     ; Data Structures:  None.
+                            26     ;
+                            27     ; Known Bugs:       None.
+                            28     ; Limitations:      None.
+                            29     ;
+                            30     ; Revision History:
+                            31     ;    11/12/13  Archan Luhar     Created hw4main.asm. Contains main function
+                            32     ;                               that calls display initialization and test
+                            33     ;                               functions.
+                            34     ;    11/18/13  Archan Luhar     Finished documentation.
+                            35     
+                            36     
+                            37     CGROUP  GROUP   CODE
+                            38     DGROUP  GROUP   DATA, STACK
+                            39     
+                            40     
+----                        41     CODE    SEGMENT PUBLIC 'CODE'
+                            42         ASSUME  CS:CGROUP, DS:DGROUP, ES:NOTHING, SS:DGROUP
+                            43     
+                            44     
+                            45     ; External references
+                            46         EXTRN   DisplayInit:NEAR
+                            47         EXTRN   DisplayTest:NEAR
+                            48         EXTRN   DisplayHex:NEAR
+                            49         EXTRN   DisplayNum:NEAR
+                            50     
+8086/87/88/186 MACRO ASSEMBLER    HW4MAIN                                                  07:16:43  11/18/;3  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                            51     
+                            52     
+0000                        53     START:  
+0000                        54     MAIN:
+0000 B8----         R       55         MOV     AX, DGROUP              ; Initialize the stack pointer
+0003 8ED0                   56         MOV     SS, AX
+0005 BCE00190       R       57         MOV     SP, OFFSET(DGROUP:TopOfStack)
+                            58     
+0009 B8----         R       59         MOV     AX, DGROUP              ; Initialize the data segment
+000C 8ED8                   60         MOV     DS, AX
+                            61     
+000E E80000         E       62         CALL    DisplayInit             ; Initialize the CS, timer, and interrupt
+                            63         
+0011 FB                     64         STI                             ; Enable interrupts
+                            65     
+0012 E80000         E       66         CALL    DisplayTest             ; Test out the display
+                            67     
+                            68     
+----                        69     CODE ENDS
+                            70     
+                            71     
+----                        72     DATA    SEGMENT PUBLIC  'DATA'
+                            73     
+                            74         ; Nothing in the data segment but need it for initializing DS
+                            75     
+----                        76     DATA    ENDS
+                            77     
+                            78     
+----                        79     STACK SEGMENT STACK 'STACK'
+                            80     
+0000 (80                    81         DB      80 DUP ('Stack ')       ; 240 words
+     537461636B20
+     )
+                            82     
+01E0                        83     TopOfStack      LABEL   WORD
+----                        84     STACK  ENDS
+                            85     
+                            86     
+                            87         END START
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

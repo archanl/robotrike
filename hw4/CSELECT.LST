@@ -1,0 +1,108 @@
+8086/87/88/186 MACRO ASSEMBLER    CSELECT                                                  07:16:44  11/18/;3  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE CSELECT
+OBJECT MODULE PLACED IN CSELECT.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE CSELECT.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1         NAME    CSELECT
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                                    CSELECT                                 ;
+                             6     ;                           Chip Select Initialization                       ;
+                             7     ;                                   EE/CS 51                                 ;
+                             8     ;                                 Archan Luhar                               ;
+                             9     ;                                 TA: Joe Greef                              ;
+                            10     ;                                                                            ;
+                            11     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                            12     
+                            13     
+                            14 +1  $INCLUDE(cselect.inc)
+                      =1    15     ; Chip Select Unit Addresses
+  FFA4                =1    16     PACSreg         EQU     0FFA4H          ; PACS register
+  FFA8                =1    17     MPCSreg         EQU     0FFA8H          ; MPCS register
+                      =1    18     
+                      =1    19     ; Control Register Values
+  0000                =1    20     PACSval         EQU     00000H          ;0000000000------  starts address 0
+                      =1    21                                             ;----------000---  reserved
+                      =1    22                                             ;-------------0--  wait for RDY inputs
+                      =1    23                                             ;--------------11  3 wait states
+                      =1    24     
+  0183                =1    25     MPCSval         EQU     00183H          ;0---------000---  reserved
+                      =1    26                                             ;-0000001--------  MCS is 8KB
+                      =1    27                                             ;--------1-------  output PCS5/PCS6
+                      =1    28                                             ;---------0------  PCS in I/O space
+                      =1    29                                             ;-------------0--  wait for RDY inputs
+                      =1    30                                             ;--------------11  3 wait states
+                            31     
+                            32     
+                            33     CGROUP  GROUP   CODE
+----                        34     CODE    SEGMENT PUBLIC 'CODE'
+                            35             ASSUME  CS:CGROUP
+                            36     
+                            37             
+                            38     ; InitDisplayCS/InitCS
+                            39     ;
+                            40     ; Description:       Initialize the Peripheral Chip Selects on the 80188.
+                            41     ;
+                            42     ; Operation:         Writes the initial values to the PACS and MPCS registers.
+                            43     ;
+                            44     ; Arguments:         None.
+                            45     ; Return Value:      None.
+                            46     ;
+                            47     ; Local Variables:   None.
+                            48     ; Shared Variables:  None.
+                            49     ; Global Variables:  None.
+                            50     ;
+8086/87/88/186 MACRO ASSEMBLER    CSELECT                                                  07:16:44  11/18/;3  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                            51     ; Input:             None.
+                            52     ; Output:            None.
+                            53     ;
+                            54     ; Error Handling:    None.
+                            55     ;
+                            56     ; Algorithms:        None.
+                            57     ; Data Structures:   None.
+                            58     ;
+                            59     ; Registers Used:    None.
+                            60     ; Stack Depth:       2 words.
+                            61     ;
+                            62     ; Author:            Glen George, Archan Luhar
+                            63     ; Last Modified:     Nov. 18, 2013
+                            64     
+0000                        65     InitDisplayCS   PROC    NEAR
+                            66                     PUBLIC  InitDisplayCS
+0000                        67     InitCS          PROC    NEAR
+                            68                     PUBLIC  InitCS
+                            69     
+0000 50                     70         PUSH AX
+0001 52                     71         PUSH DX
+                            72     
+0002 BAA4FF                 73         MOV     DX, PACSreg     ;setup to write to PACS register
+0005 B80000                 74         MOV     AX, PACSval
+0008 EE                     75         OUT     DX, AL          ;write PACSval to PACS (base at 0, 3 wait states)
+                            76     
+0009 BAA8FF                 77         MOV     DX, MPCSreg     ;setup to write to MPCS register
+000C B88301                 78         MOV     AX, MPCSval
+000F EE                     79         OUT     DX, AL          ;write MPCSval to MPCS (I/O space, 3 wait states)
+                            80     
+0010 5A                     81         POP DX
+0011 58                     82         POP AX
+0012 C3                     83         RET
+                            84     
+                            85     InitCS          ENDP
+                            86     InitDisplayCS   ENDP
+                            87     
+                            88     
+                            89     
+----                        90     CODE ENDS
+                            91         END
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

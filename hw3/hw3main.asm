@@ -91,7 +91,7 @@ MAIN:
 ; Enqueues a bunch of numbers to see if properly stored. Must use debugger
 ; to verify queue data in memory at SI.
 MyQueueTest:
-    MOV AL, 1002H;
+    MOV AX, 1002H;
     CALL Enqueue;
     MOV AX, 3004H;
     CALL Enqueue;

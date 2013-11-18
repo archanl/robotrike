@@ -1,0 +1,22 @@
+
+DOS 5.0 (038-N) 8086 LINKER, V2.7
+
+INPUT FILES: HW3MAIN.OBJ, QUEUE.OBJ, HW3TEST.OBJ
+OUTPUT FILE: HW3MAIN.LNK
+CONTROLS SPECIFIED IN INVOCATION COMMAND:
+DATE:  11/10/;3  TIME:  22:33:59
+
+
+LINK MAP OF MODULE HW3MAIN
+
+LOGICAL SEGMENTS INCLUDED:
+LENGTH ADDRESS ALIGN  SEGMENT         CLASS           OVERLAY
+ 0000H ------    G    ??SEG                                         
+ 045BH ------    G    CODE            CODE                          
+ 0412H ------    G    DATA            DATA                          
+ 01E0H ------    G    STACK           STACK                         
+
+INPUT MODULES INCLUDED:
+HW3MAIN.OBJ(HW3MAIN)
+QUEUE.OBJ(QUEUE)
+HW3TEST.OBJ(HW3TEST)

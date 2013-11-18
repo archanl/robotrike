@@ -1,0 +1,248 @@
+8086/87/88/186 MACRO ASSEMBLER    DTIMER                                                   03:27:45  11/18/;3  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE DTIMER
+OBJECT MODULE PLACED IN DTIMER.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE DTIMER.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1         NAME    DTIMER
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                                    DTIMER                                  ;
+                             6     ;                   Display Timer and Interrupt Setup Functions              ;
+                             7     ;                                   EE/CS 51                                 ;
+                             8     ;                                 Archan Luhar                               ;
+                             9     ;                                 TA: Joe Greef                              ;
+                            10     ;                                                                            ;
+                            11     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                            12     
+                            13     ; Include file
+                            14 +1  $INCLUDE(display.inc)
+                      =1    15     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    16     ;                                                                            ;
+                      =1    17     ;                                  DISPLAY.INC                               ;
+                      =1    18     ;                               DISPLAY ROUTINES                             ;
+                      =1    19     ;                                 Include File                               ;
+                      =1    20     ;                                                                            ;
+                      =1    21     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    22     
+                      =1    23     ; General Definitions
+  0000                =1    24     ASCII_NULL      EQU     0
+  0008                =1    25     BYTE_BITS       EQU     8               ; Number of bits in a byte
+                      =1    26     
+                      =1    27     ; Display Definitions
+  0000                =1    28     LEDDisplay      EQU     0000H           ; Address of first display
+  0008                =1    29     LEDDisplay14    EQU     0008H           ; High byte address for for 14 segments
+  0008                =1    30     NUM_DIGITS      EQU     8               ; Number of displays/digits
+  0000                =1    31     BLANK_DISPLAY   EQU     0               ; Clear display code
+                      =1    32     
+                      =1    33     
+                      =1    34     
+                      =1    35     ; Timer Addresses
+  FF66                =1    36     Tmr2Ctrl        EQU     0FF66H          ; Timer 2 Control Register
+  FF62                =1    37     Tmr2MaxCnt      EQU     0FF62H          ; Timer 2 Max Count A Register
+  FF60                =1    38     Tmr2Count       EQU     0FF60H          ; Timer 2 Count Register
+                      =1    39     
+                      =1    40     ; Timer Control Register Value
+  E001                =1    41     Tmr2CtrlVal     EQU     0E001H          ;1--- ---- ---- ----  enable timer
+                      =1    42                                             ;-1-- ---- ---- ----  write to control
+                      =1    43                                             ;--1- ---- ---- ----  enable interrupts
+                      =1    44                                             ;---- 0000 00-0 000-  reserved
+                      =1    45                                             ;---0 ---- --0- ----  read only
+                      =1    46                                             ;---- ---- ---- ---1  continuous mode
+                      =1    47     
+                      =1    48     ; Timer Interrupt Vector
+  0013                =1    49     Tmr2Vec         EQU     19              ; Timer 2
+                      =1    50     
+8086/87/88/186 MACRO ASSEMBLER    DTIMER                                                   03:27:45  11/18/;3  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                      =1    51     
+                      =1    52     
+                      =1    53     ; Interrupt Controller Addresses
+  FF32                =1    54     INTCtrlrCtrl    EQU     0FF32H          ; Timer interrupt controller
+  FF22                =1    55     INTCtrlrEOI     EQU     0FF22H          ; Interrupt controller EOI register
+                      =1    56     
+                      =1    57     ; Interrupt Controller Register Values
+  0001                =1    58     INTCtrlrCVal    EQU     00001H          ; Enable timer interrupt with priority 1
+                      =1    59                                             ;0000 0000 0000 ----  reserved
+                      =1    60                                             ;---- ---- ---- 0---  enable interrupt
+                      =1    61                                             ;---- ---- ---- -001  timer priority
+                      =1    62     
+  0008                =1    63     TimerEOI        EQU     00008H          ; Timer EOI command for all timers
+                      =1    64     
+                      =1    65     
+                      =1    66     
+                      =1    67     ; Chip Select Unit Addresses
+  FFA4                =1    68     PACSreg         EQU     0FFA4H          ;address of PACS register
+  FFA8                =1    69     MPCSreg         EQU     0FFA8H          ;address of MPCS register
+                      =1    70     
+                      =1    71     ; Control Register Values
+  0003                =1    72     PACSval         EQU     00003H          ;PCS base at 0, 3 wait states
+                      =1    73                                             ;0000000000------  starts at address 0
+                      =1    74                                             ;----------000---  reserved
+                      =1    75                                             ;-------------0--  wait for RDY inputs
+                      =1    76                                             ;--------------11  3 wait states
+                      =1    77     
+  0183                =1    78     MPCSval         EQU     00183H          ;PCS in I/O space, use PCS5/6, 3 wait states
+                      =1    79                                             ;0---------000---  reserved
+                      =1    80                                             ;-0000001--------  MCS is 8KB
+                      =1    81                                             ;--------1-------  output PCS5/PCS6
+                      =1    82                                             ;---------0------  PCS in I/O space
+                      =1    83                                             ;-------------0--  wait for RDY inputs
+                      =1    84                                             ;--------------11  3 wait states
+                      =1    85     
+                      =1    86     
+                      =1    87     
+                      =1    88     ; Timing Definitions
+                      =1    89     
+  7530                =1    90     COUNTS_PER_MS   EQU     30000            ; Number of timer counts per 1 ms
+                      =1    91                                             ; (assumes 18.432 MHz clock)
+                            92     
+                            93     
+                            94     CGROUP  GROUP   CODE
+----                        95     CODE    SEGMENT PUBLIC 'CODE'
+                            96             ASSUME  CS:CGROUP
+                            97     
+                            98     ; External references
+                            99         EXTRN   DisplayTimerEventHandler:NEAR
+                           100     
+                           101     
+                           102     
+                           103     ; InitDisplayCS
+                           104     ;
+                           105     ; Description:       Initialize the Peripheral Chip Selects on the 80188.
+8086/87/88/186 MACRO ASSEMBLER    DTIMER                                                   03:27:45  11/18/;3  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           106     ;
+                           107     ; Operation:         Write the initial values to the PACS and MPCS registers.
+                           108     ;
+                           109     ; Arguments:         None.
+                           110     ; Return Value:      None.
+                           111     ;
+                           112     ; Local Variables:   None.
+                           113     ; Shared Variables:  None.
+                           114     ; Global Variables:  None.
+                           115     ;
+                           116     ; Input:             None.
+                           117     ; Output:            None.
+                           118     ;
+                           119     ; Error Handling:    None.
+                           120     ;
+                           121     ; Algorithms:        None.
+                           122     ; Data Structures:   None.
+                           123     ;
+                           124     ; Registers Changed: AX, DX
+                           125     ; Stack Depth:       0 words
+                           126     ;
+                           127     ; Author:            Glen George
+                           128     ; Last Modified:     Oct. 29, 1997
+                           129     
+0000                       130     InitDisplayCS   PROC    NEAR
+                           131                     PUBLIC  InitDisplayCS
+                           132     
+0000 50                    133         PUSH AX
+0001 52                    134         PUSH DX
+                           135     
+0002 BAA4FF                136         MOV     DX, PACSreg     ;setup to write to PACS register
+0005 B80300                137         MOV     AX, PACSval
+0008 EE                    138         OUT     DX, AL          ;write PACSval to PACS (base at 0, 3 wait states)
+                           139     
+0009 BAA8FF                140         MOV     DX, MPCSreg     ;setup to write to MPCS register
+000C B88301                141         MOV     AX, MPCSval
+000F EE                    142         OUT     DX, AL          ;write MPCSval to MPCS (I/O space, 3 wait states)
+                           143     
+                           144     
+0010 5A                    145         POP DX
+0011 58                    146         POP AX
+0012 C3                    147         RET
+                           148     
+                           149     InitDisplayCS  ENDP
+                           150     
+                           151     
+                           152     
+0013                       153     SetDisplayTimerEventHandler PROC    NEAR
+                           154                                 PUBLIC  SetDisplayTimerEventHandler
+0013                       155     InstallTimer2EventHandler   PROC    NEAR
+                           156                                 PUBLIC  InstallTimer2EventHandler
+                           157     
+0013 50                    158         PUSH AX                 ; Save Registers
+0014 06                    159         PUSH ES
+                           160     
+8086/87/88/186 MACRO ASSEMBLER    DTIMER                                                   03:27:45  11/18/;3  PAGE    4
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0015 33C0                  161         XOR     AX, AX          ; Clear ES (interrupt vectors are in segment 0)
+0017 8EC0                  162         MOV     ES, AX
+                           163                                 ; Write the vector
+0019 26C7064C002A00 R      164         MOV     ES: WORD PTR (4 * Tmr2Vec), OFFSET(Timer2EventHandler)
+0020 26C7064E00---- R      165         MOV     ES: WORD PTR (4 * Tmr2Vec + 2), SEG(Timer2EventHandler)
+                           166     
+0027 07                    167         POP ES
+0028 58                    168         POP AX
+0029 C3                    169         RET
+                           170     
+                           171     InstallTimer2EventHandler   ENDP
+                           172     SetDisplayTimerEventHandler ENDP
+                           173     
+                           174     
+002A                       175     Timer2EventHandler          PROC    NEAR
+                           176                                 PUBLIC  Timer2EventHandler
+                           177     
+002A E80000         E      178         CALL DisplayTimerEventHandler
+002D CF                    179         IRET                    ; IRET must be used in interrupt handler
+                           180     
+                           181     Timer2EventHandler          ENDP
+                           182     
+                           183     
+002E                       184     SetDisplayTimerInterrupt    PROC    NEAR
+                           185                                 PUBLIC  SetDisplayTimerInterrupt
+002E                       186     SetTimer2Interrupt          PROC    NEAR
+                           187                                 PUBLIC  SetTimer2Interrupt
+                           188     
+002E BA60FF                189             MOV     DX, Tmr2Count       ; Initialize the count register to 0
+0031 33C0                  190             XOR     AX, AX
+0033 EE                    191             OUT     DX, AL
+                           192     
+0034 BA62FF                193             MOV     DX, Tmr2MaxCnt      ; Setup max count for 1ms counts
+0037 B83075                194             MOV     AX, COUNTS_PER_MS
+003A EE                    195             OUT     DX, AL
+                           196     
+003B BA66FF                197             MOV     DX, Tmr2Ctrl        ; Setup control register, enable interrupts
+003E B801E0                198             MOV     AX, Tmr2CtrlVal
+0041 EE                    199             OUT     DX, AL
+                           200                                         ; Initialize interrupt controller for timers
+0042 BA32FF                201             MOV     DX, INTCtrlrCtrl    ; Setup the interrupt control register
+0045 B80100                202             MOV     AX, INTCtrlrCVal
+0048 EE                    203             OUT     DX, AL
+                           204     
+0049 BA22FF                205             MOV     DX, INTCtrlrEOI     ; Send a timer EOI (to clear out controller)
+004C B80800                206             MOV     AX, TimerEOI
+004F EE                    207             OUT     DX, AL
+                           208     
+0050 C3                    209             RET                     ;done so return
+                           210     
+                           211     SetTimer2Interrupt          ENDP
+                           212     SetDisplayTimerInterrupt    ENDP
+                           213     
+                           214     
+----                       215     CODE ENDS
+8086/87/88/186 MACRO ASSEMBLER    DTIMER                                                   03:27:45  11/18/;3  PAGE    5
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           216         END
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND
