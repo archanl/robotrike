@@ -1,4 +1,4 @@
-8086/87/88/186 MACRO ASSEMBLER    HW5MAIN                                                  07:39:28  11/20/;3  PAGE    1
+8086/87/88/186 MACRO ASSEMBLER    HW5MAIN                                                  08:11:07  11/20/;3  PAGE    1
 
 
 DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE HW5MAIN
@@ -58,7 +58,7 @@ LOC  OBJ                  LINE     SOURCE
                             48     
                             49     
                             50     ; External references
-8086/87/88/186 MACRO ASSEMBLER    HW5MAIN                                                  07:39:28  11/20/;3  PAGE    2
+8086/87/88/186 MACRO ASSEMBLER    HW5MAIN                                                  08:11:07  11/20/;3  PAGE    2
 
 
 LOC  OBJ                  LINE     SOURCE

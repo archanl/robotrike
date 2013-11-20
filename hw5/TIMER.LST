@@ -1,4 +1,4 @@
-8086/87/88/186 MACRO ASSEMBLER    TIMER                                                    07:39:29  11/20/;3  PAGE    1
+8086/87/88/186 MACRO ASSEMBLER    TIMER                                                    08:11:08  11/20/;3  PAGE    1
 
 
 DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE TIMER
@@ -58,7 +58,7 @@ LOC  OBJ                  LINE     SOURCE
                       =1    48     
                       =1    49     ; Timer Addresses
   FF66                =1    50     Tmr2Ctrl        EQU     0FF66H          ; Timer 2 Control Register
-8086/87/88/186 MACRO ASSEMBLER    TIMER                                                    07:39:29  11/20/;3  PAGE    2
+8086/87/88/186 MACRO ASSEMBLER    TIMER                                                    08:11:08  11/20/;3  PAGE    2
 
 
 LOC  OBJ                  LINE     SOURCE
@@ -118,7 +118,7 @@ LOC  OBJ                  LINE     SOURCE
                            103     ;
                            104     ; Author:           Archan Luhar
                            105     ; Last Modified:    Nov. 20, 2013
-8086/87/88/186 MACRO ASSEMBLER    TIMER                                                    07:39:29  11/20/;3  PAGE    3
+8086/87/88/186 MACRO ASSEMBLER    TIMER                                                    08:11:08  11/20/;3  PAGE    3
 
 
 LOC  OBJ                  LINE     SOURCE
@@ -178,7 +178,7 @@ LOC  OBJ                  LINE     SOURCE
 000D 26C7064C001E00 R      158         MOV     ES: WORD PTR (4 * Tmr2Vec), OFFSET(Timer2EventHandler)
 0014 26C7064E00---- R      159         MOV     ES: WORD PTR (4 * Tmr2Vec + 2), SEG(Timer2EventHandler)
                            160     
-8086/87/88/186 MACRO ASSEMBLER    TIMER                                                    07:39:29  11/20/;3  PAGE    4
+8086/87/88/186 MACRO ASSEMBLER    TIMER                                                    08:11:08  11/20/;3  PAGE    4
 
 
 LOC  OBJ                  LINE     SOURCE
@@ -192,136 +192,137 @@ LOC  OBJ                  LINE     SOURCE
                            167     
                            168     ; Timer2EventHandler
                            169     ;
-                           170     ; Description:      Handles the timer 2 interrupts. Calls the display handler.
-                           171     ;
-                           172     ; Operation:        Saves necessary registers.
-                           173     ;                   Calls the display timer event handler.
-                           174     ;                   Sends a timer EOI to the interrupt control register.
-                           175     ;                   Then returns using IRET.
-                           176     ;
-                           177     ; Arguments:        None.
-                           178     ; Return Value:     None.
-                           179     ;
-                           180     ; Local Variables:  None.
-                           181     ; Shared Variables: None.
-                           182     ; Global Variables: None.
-                           183     ;
-                           184     ; Input:            None.
-                           185     ; Output:           None.
-                           186     ;
-                           187     ; Error Handling:   None.
-                           188     ;
-                           189     ; Algorithms:       None.
-                           190     ; Data Structures:  None.
-                           191     ;
-                           192     ; Registers Used:   None.
-                           193     ; Stack Depth:      0 words
-                           194     ;
-                           195     ; Author:           Glen George, Archan Luhar
-                           196     ; Last Modified:    Nov. 18, 2013
-                           197     
-001E                       198     Timer2EventHandler          PROC    NEAR
-                           199     
-001E 52                    200         PUSH DX
-001F 50                    201         PUSH AX
-                           202     
-0020 E80000         E      203         CALL DisplayTimerEventHandler
-0023 E80000         E      204         CALL SwitchesTimerEventHandler
-                           205     
-0026 BA22FF                206         MOV DX, INTCtrlrEOI             ; Send timer EOI
-0029 B80800                207         MOV AX, TimerEOI
-002C EE                    208         OUT DX, AL
-                           209     
-002D 58                    210         POP AX
-002E 5A                    211         POP DX
-002F CF                    212         IRET                            ; IRET must be used in interrupt handler
-                           213     
-                           214     Timer2EventHandler          ENDP
-                           215     
-8086/87/88/186 MACRO ASSEMBLER    TIMER                                                    07:39:29  11/20/;3  PAGE    5
+                           170     ; Description:      Handles the timer 2 interrupts. Calls all functions that
+                           171     ;                   rely on timer 2 events.
+                           172     ;
+                           173     ; Operation:        Calls the display timer event handler.
+                           174     ;                   Calls the switches timer event handler.
+                           175     ;                   Sends a timer EOI to the interrupt control register.
+                           176     ;                   Then returns using IRET.
+                           177     ;
+                           178     ; Arguments:        None.
+                           179     ; Return Value:     None.
+                           180     ;
+                           181     ; Local Variables:  None.
+                           182     ; Shared Variables: None.
+                           183     ; Global Variables: None.
+                           184     ;
+                           185     ; Input:            None.
+                           186     ; Output:           None.
+                           187     ;
+                           188     ; Error Handling:   None.
+                           189     ;
+                           190     ; Algorithms:       None.
+                           191     ; Data Structures:  None.
+                           192     ;
+                           193     ; Registers Used:   None.
+                           194     ; Stack Depth:      2 words and a NEAR call.
+                           195     ;
+                           196     ; Author:           Glen George, Archan Luhar
+                           197     ; Last Modified:    Nov. 18, 2013
+                           198     
+001E                       199     Timer2EventHandler          PROC    NEAR
+                           200     
+001E 52                    201         PUSH DX
+001F 50                    202         PUSH AX
+                           203     
+0020 E80000         E      204         CALL DisplayTimerEventHandler
+0023 E80000         E      205         CALL SwitchesTimerEventHandler
+                           206     
+0026 BA22FF                207         MOV DX, INTCtrlrEOI             ; Send timer EOI
+0029 B80800                208         MOV AX, TimerEOI
+002C EE                    209         OUT DX, AL
+                           210     
+002D 58                    211         POP AX
+002E 5A                    212         POP DX
+002F CF                    213         IRET                            ; IRET must be used in interrupt handler
+                           214     
+                           215     Timer2EventHandler          ENDP
+8086/87/88/186 MACRO ASSEMBLER    TIMER                                                    08:11:08  11/20/;3  PAGE    5
 
 
 LOC  OBJ                  LINE     SOURCE
 
                            216     
-                           217     ; SetTimerInterrupts
-                           218     ;
-                           219     ; IMPORTANT NOTE:   CURRENLTY ONLY INITIALIZES TIMER 2.
-                           220     ;
-                           221     ; Description:      Initialize the 80188 Timers.  The timers are initialized
-                           222     ;                   to generate interrupts every MS_PER_SEC milliseconds.
-                           223     ;                   The interrupt controller is also initialized to allow the
-                           224     ;                   timer interrupts.  Timer #2 is used to generate the
-                           225     ;                   interrupts for the display handler.
-                           226     ;
-                           227     ; Operation:        The appropriate values are written to the timer control
-                           228     ;                   registers in the PCB.  Also, the timer count registers
-                           229     ;                   are reset to zero.  Finally, the interrupt controller is
-                           230     ;                   setup to accept timer interrupts and any pending
-                           231     ;                   interrupts are cleared by sending a TimerEOI to the
-                           232     ;                   interrupt controller.
-                           233     ;
-                           234     ; Arguments:        None.
-                           235     ; Return Value:     None.
-                           236     ;
-                           237     ; Local Variables:  None.
-                           238     ; Shared Variables: None.
-                           239     ; Global Variables: None.
-                           240     ;
-                           241     ; Input:            None.
-                           242     ; Output:           None.
-                           243     ;
-                           244     ; Error Handling:   None.
-                           245     ;
-                           246     ; Algorithms:       None.
-                           247     ; Data Structures:  None.
-                           248     ;
-                           249     ; Registers Used:   None.
-                           250     ; Stack Depth:      0 words
-                           251     ;
-                           252     ; Author:           Glen George, Archan Luhar
-                           253     ; Last Modified:    Nov. 18, 2013
-                           254     
-0030                       255     SetTimerInterrupts          PROC    NEAR
-                           256                                 PUBLIC  SetTimerInterrupts
-                           257     
-0030 50                    258             PUSH AX                     ; Save registers
-0031 52                    259             PUSH DX
-                           260     
-0032 BA60FF                261             MOV     DX, Tmr2Count       ; Initialize the count register to 0
-0035 33C0                  262             XOR     AX, AX
-0037 EE                    263             OUT     DX, AL
-                           264     
-0038 BA62FF                265             MOV     DX, Tmr2MaxCnt      ; Setup max count for 1ms counts
-003B B80009                266             MOV     AX, COUNTS_PER_MS
-003E EE                    267             OUT     DX, AL
-                           268     
-003F BA66FF                269             MOV     DX, Tmr2Ctrl        ; Setup control register, enable interrupts
-0042 B801E0                270             MOV     AX, Tmr2CtrlVal
-8086/87/88/186 MACRO ASSEMBLER    TIMER                                                    07:39:29  11/20/;3  PAGE    6
+                           217     
+                           218     ; SetTimerInterrupts
+                           219     ;
+                           220     ; IMPORTANT NOTE:   CURRENLTY ONLY INITIALIZES TIMER 2.
+                           221     ;
+                           222     ; Description:      Initialize the 80188 Timers.  The timers are initialized
+                           223     ;                   to generate interrupts every MS_PER_SEC milliseconds.
+                           224     ;                   The interrupt controller is also initialized to allow the
+                           225     ;                   timer interrupts.  Timer #2 is used to generate the
+                           226     ;                   interrupts for the display handler.
+                           227     ;
+                           228     ; Operation:        The appropriate values are written to the timer control
+                           229     ;                   registers in the PCB.  Also, the timer count registers
+                           230     ;                   are reset to zero.  Finally, the interrupt controller is
+                           231     ;                   setup to accept timer interrupts and any pending
+                           232     ;                   interrupts are cleared by sending a TimerEOI to the
+                           233     ;                   interrupt controller.
+                           234     ;
+                           235     ; Arguments:        None.
+                           236     ; Return Value:     None.
+                           237     ;
+                           238     ; Local Variables:  None.
+                           239     ; Shared Variables: None.
+                           240     ; Global Variables: None.
+                           241     ;
+                           242     ; Input:            None.
+                           243     ; Output:           None.
+                           244     ;
+                           245     ; Error Handling:   None.
+                           246     ;
+                           247     ; Algorithms:       None.
+                           248     ; Data Structures:  None.
+                           249     ;
+                           250     ; Registers Used:   None.
+                           251     ; Stack Depth:      2 words.
+                           252     ;
+                           253     ; Author:           Glen George, Archan Luhar
+                           254     ; Last Modified:    Nov. 18, 2013
+                           255     
+0030                       256     SetTimerInterrupts          PROC    NEAR
+                           257                                 PUBLIC  SetTimerInterrupts
+                           258     
+0030 50                    259             PUSH AX                     ; Save registers
+0031 52                    260             PUSH DX
+                           261     
+0032 BA60FF                262             MOV     DX, Tmr2Count       ; Initialize the count register to 0
+0035 33C0                  263             XOR     AX, AX
+0037 EE                    264             OUT     DX, AL
+                           265     
+0038 BA62FF                266             MOV     DX, Tmr2MaxCnt      ; Setup max count for 1ms counts
+003B B80009                267             MOV     AX, COUNTS_PER_MS
+003E EE                    268             OUT     DX, AL
+                           269     
+003F BA66FF                270             MOV     DX, Tmr2Ctrl        ; Setup control register, enable interrupts
+8086/87/88/186 MACRO ASSEMBLER    TIMER                                                    08:11:08  11/20/;3  PAGE    6
 
 
 LOC  OBJ                  LINE     SOURCE
 
-0045 EE                    271             OUT     DX, AL
-                           272                                         ; Initialize interrupt controller for timers
-0046 BA32FF                273             MOV     DX, INTCtrlrCtrl    ; Setup the interrupt control register
-0049 B80100                274             MOV     AX, INTCtrlrCVal
-004C EE                    275             OUT     DX, AL
-                           276     
-004D BA22FF                277             MOV     DX, INTCtrlrEOI     ; Send a timer EOI (to clear out controller)
-0050 B80800                278             MOV     AX, TimerEOI
-0053 EE                    279             OUT     DX, AL
-                           280             
-0054 5A                    281             POP DX                      ; Restore registers
-0055 58                    282             POP AX
-                           283     
-0056 C3                    284             RET
-                           285     
-                           286     SetTimerInterrupts          ENDP
-                           287     
+0042 B801E0                271             MOV     AX, Tmr2CtrlVal
+0045 EE                    272             OUT     DX, AL
+                           273                                         ; Initialize interrupt controller for timers
+0046 BA32FF                274             MOV     DX, INTCtrlrCtrl    ; Setup the interrupt control register
+0049 B80100                275             MOV     AX, INTCtrlrCVal
+004C EE                    276             OUT     DX, AL
+                           277     
+004D BA22FF                278             MOV     DX, INTCtrlrEOI     ; Send a timer EOI (to clear out controller)
+0050 B80800                279             MOV     AX, TimerEOI
+0053 EE                    280             OUT     DX, AL
+                           281             
+0054 5A                    282             POP DX                      ; Restore registers
+0055 58                    283             POP AX
+                           284     
+0056 C3                    285             RET
+                           286     
+                           287     SetTimerInterrupts          ENDP
                            288     
-----                       289     CODE ENDS
-                           290         END
+                           289     
+----                       290     CODE ENDS
+                           291         END
 
 ASSEMBLY COMPLETE, NO ERRORS FOUND
