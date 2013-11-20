@@ -28,10 +28,11 @@
 ; Limitations:      None.
 ;
 ; Revision History:
-;    11/12/13  Archan Luhar     Created hw4main.asm. Contains main function
+;   11/12/13    Archan Luhar    Created hw4main.asm. Contains main function
 ;                               that calls display initialization and test
 ;                               functions.
-;    11/18/13  Archan Luhar     Finished documentation.
+;   11/18/13    Archan Luhar    Finished documentation.
+;   11/20/13    Archan Luhar    Modified Initialization calls (modularized).
 
 
 CGROUP  GROUP   CODE
@@ -43,10 +44,10 @@ CODE    SEGMENT PUBLIC 'CODE'
 
 
 ; External references
-    EXTRN   DisplayInit:NEAR
+    EXTRN   InitCS:NEAR
+    EXTRN   InitTimer:NEAR
+    EXTRN   InitDisplay:NEAR
     EXTRN   DisplayTest:NEAR
-    EXTRN   DisplayHex:NEAR
-    EXTRN   DisplayNum:NEAR
 
 
 
@@ -59,9 +60,12 @@ MAIN:
     MOV     AX, DGROUP              ; Initialize the data segment
     MOV     DS, AX
 
-    CALL    DisplayInit             ; Initialize the CS, timer, and interrupt
+    CALL    InitCS                  ; Initialize chip selects
+    CALL    InitTimer               ; Initialize timer handlers and controllers
+    CALL    InitDisplay             ; Initialize display variables
     
-    STI                             ; Enable interrupts
+    STI                             ; Enable interrupts so event handlers can
+                                    ; function.
 
     CALL    DisplayTest             ; Test out the display
 

@@ -1,4 +1,4 @@
-8086/87/88/186 MACRO ASSEMBLER    HW4MAIN                                                  07:16:43  11/18/;3  PAGE    1
+8086/87/88/186 MACRO ASSEMBLER    HW4MAIN                                                  07:55:40  11/20/;3  PAGE    1
 
 
 DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE HW4MAIN
@@ -38,69 +38,73 @@ LOC  OBJ                  LINE     SOURCE
                             28     ; Limitations:      None.
                             29     ;
                             30     ; Revision History:
-                            31     ;    11/12/13  Archan Luhar     Created hw4main.asm. Contains main function
+                            31     ;   11/12/13    Archan Luhar    Created hw4main.asm. Contains main function
                             32     ;                               that calls display initialization and test
                             33     ;                               functions.
-                            34     ;    11/18/13  Archan Luhar     Finished documentation.
-                            35     
+                            34     ;   11/18/13    Archan Luhar    Finished documentation.
+                            35     ;   11/20/13    Archan Luhar    Modified Initialization calls (modularized).
                             36     
-                            37     CGROUP  GROUP   CODE
-                            38     DGROUP  GROUP   DATA, STACK
-                            39     
+                            37     
+                            38     CGROUP  GROUP   CODE
+                            39     DGROUP  GROUP   DATA, STACK
                             40     
-----                        41     CODE    SEGMENT PUBLIC 'CODE'
-                            42         ASSUME  CS:CGROUP, DS:DGROUP, ES:NOTHING, SS:DGROUP
-                            43     
+                            41     
+----                        42     CODE    SEGMENT PUBLIC 'CODE'
+                            43         ASSUME  CS:CGROUP, DS:DGROUP, ES:NOTHING, SS:DGROUP
                             44     
-                            45     ; External references
-                            46         EXTRN   DisplayInit:NEAR
-                            47         EXTRN   DisplayTest:NEAR
-                            48         EXTRN   DisplayHex:NEAR
-                            49         EXTRN   DisplayNum:NEAR
-                            50     
-8086/87/88/186 MACRO ASSEMBLER    HW4MAIN                                                  07:16:43  11/18/;3  PAGE    2
+                            45     
+                            46     ; External references
+                            47         EXTRN   InitCS:NEAR
+                            48         EXTRN   InitTimer:NEAR
+                            49         EXTRN   InitDisplay:NEAR
+                            50         EXTRN   DisplayTest:NEAR
+8086/87/88/186 MACRO ASSEMBLER    HW4MAIN                                                  07:55:40  11/20/;3  PAGE    2
 
 
 LOC  OBJ                  LINE     SOURCE
 
                             51     
                             52     
-0000                        53     START:  
-0000                        54     MAIN:
-0000 B8----         R       55         MOV     AX, DGROUP              ; Initialize the stack pointer
-0003 8ED0                   56         MOV     SS, AX
-0005 BCE00190       R       57         MOV     SP, OFFSET(DGROUP:TopOfStack)
-                            58     
-0009 B8----         R       59         MOV     AX, DGROUP              ; Initialize the data segment
-000C 8ED8                   60         MOV     DS, AX
-                            61     
-000E E80000         E       62         CALL    DisplayInit             ; Initialize the CS, timer, and interrupt
-                            63         
-0011 FB                     64         STI                             ; Enable interrupts
-                            65     
-0012 E80000         E       66         CALL    DisplayTest             ; Test out the display
-                            67     
-                            68     
-----                        69     CODE ENDS
-                            70     
+                            53     
+0000                        54     START:  
+0000                        55     MAIN:
+0000 B8----         R       56         MOV     AX, DGROUP              ; Initialize the stack pointer
+0003 8ED0                   57         MOV     SS, AX
+0005 BCE00190       R       58         MOV     SP, OFFSET(DGROUP:TopOfStack)
+                            59     
+0009 B8----         R       60         MOV     AX, DGROUP              ; Initialize the data segment
+000C 8ED8                   61         MOV     DS, AX
+                            62     
+000E E80000         E       63         CALL    InitCS                  ; Initialize chip selects
+0011 E80000         E       64         CALL    InitTimer               ; Initialize timer handlers and controllers
+0014 E80000         E       65         CALL    InitDisplay             ; Initialize display variables
+                            66         
+0017 FB                     67         STI                             ; Enable interrupts so event handlers can
+                            68                                         ; function.
+                            69     
+0018 E80000         E       70         CALL    DisplayTest             ; Test out the display
                             71     
-----                        72     DATA    SEGMENT PUBLIC  'DATA'
-                            73     
-                            74         ; Nothing in the data segment but need it for initializing DS
+                            72     
+----                        73     CODE ENDS
+                            74     
                             75     
-----                        76     DATA    ENDS
+----                        76     DATA    SEGMENT PUBLIC  'DATA'
                             77     
-                            78     
-----                        79     STACK SEGMENT STACK 'STACK'
-                            80     
-0000 (80                    81         DB      80 DUP ('Stack ')       ; 240 words
+                            78         ; Nothing in the data segment but need it for initializing DS
+                            79     
+----                        80     DATA    ENDS
+                            81     
+                            82     
+----                        83     STACK SEGMENT STACK 'STACK'
+                            84     
+0000 (80                    85         DB      80 DUP ('Stack ')       ; 240 words
      537461636B20
      )
-                            82     
-01E0                        83     TopOfStack      LABEL   WORD
-----                        84     STACK  ENDS
-                            85     
                             86     
-                            87         END START
+01E0                        87     TopOfStack      LABEL   WORD
+----                        88     STACK  ENDS
+                            89     
+                            90     
+                            91         END START
 
 ASSEMBLY COMPLETE, NO ERRORS FOUND

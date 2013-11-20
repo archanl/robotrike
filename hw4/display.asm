@@ -10,12 +10,11 @@
 ;                                                                            ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; This file contains functions to intialize and write to the display of the
-; target board.
+; This file contains functions to handle a periodic timer event to update
+; the display and functions to display an ASCII string, hexadecimal number,
+; or decimal number.
 ;
 ; The included public functions are:
-;   - DisplayInit
-;           Calls necessary chip select, interrupt, and timer initialization
 ;   - DisplayTimerEventHandler
 ;           Updates the display, iterating over the display buffer
 ;   - Display
@@ -28,7 +27,9 @@
 ; Revision History:
 ;       11/12/2013      Archan Luhar    Finished debugging.
 ;       11/18/2013      Archan Luhar    Finished documentation.
+;       11/20/2013      Archan Luhar    Updated how data is initialized.
 
+; local includes
 $INCLUDE(general.inc)
 $INCLUDE(display.inc)
 
@@ -39,34 +40,29 @@ CODE    SEGMENT PUBLIC 'CODE'
         ASSUME  CS:CGROUP, DS:DGROUP, ES:NOTHING, SS:DGROUP
 
 ; External references
-    EXTRN   InitDisplayCS:NEAR
-    EXTRN   SetDisplayTimerEventHandler:NEAR
-    EXTRN   SetDisplayTimerInterrupt:NEAR
     EXTRN   Dec2String:NEAR
     EXTRN   Hex2String:NEAR
     EXTRN   ASCIISegTable:NEAR
 
-
-
-; DisplayInit
+; InitDisplay
 ;
-; Description:      This function calls several functions to initialize
-;                   the chip selects, timer event handlers, and install the
-;                   timer interrupts so that the program can use the target
-;                   board display to display any ascii string just by calling
-;                   Display.
+; Description:      This function initializes the shared variables for the
+;                   display routines. MUST call this before calling any display
+;                   routine.
 ;
-; Operation:        Calls chip select initialization function.
-;                   Calls function to install the event handler.
-;                   Calls function to set up the timer interrupts.
+; Operation:        Zeroes out display_buffer array. Zeroes out display_ascii
+;                   array. Initializes display_index to beginning: 0.
 ;
 ; Arguments:        None.
 ;
 ; Return Value:     None.
 ;
-; Local Variables:  None.
+; Local Variables:  BX = array offset
+;                   CX = array looping end condition
 ;
-; Shared Variables: None.
+; Shared Variables: display_buffer
+;                   display_index
+;                   display_ascii
 ;
 ; Global Variables: None.
 ;
@@ -82,117 +78,42 @@ CODE    SEGMENT PUBLIC 'CODE'
 ;
 ; Registers Used:   None.
 ;
-; Stack Depth:      0.
+; Stack Depth:      2 words.
 ;
 ; Author:           Archan Luhar
-; Last Modified:    11/18/2013
+; Last Modified:    11/20/2013
 
-DisplayInit    PROC    NEAR
-               PUBLIC  DisplayInit
+InitDisplay    PROC    NEAR
+               PUBLIC  InitDisplay
 
-    CALL InitDisplayCS                  ; Initialize chip selects
-    CALL SetDisplayTimerEventHandler    ; Install the display event handler
-    CALL SetDisplayTimerInterrupt       ; Setup timer interrupt registers
+    PUSH BX
+    PUSH CX
+
+    MOV BX, OFFSET(display_buffer)
+    MOV CX, OFFSET(display_buffer) + NUM_DIGITS * BYTES_IN_WORD
+    InitDisplayBuffer:
+        MOV WORD PTR [BX], BLANK_DISPLAY
+        INC BX
+        CMP BX, CX
+        JNE InitDisplayBuffer
+    
+    MOV display_index, 0
+    
+    MOV BX, OFFSET(display_ascii)
+    MOV CX, OFFSET(display_ascii) + NUM_DIGITS
+    InitDisplayASCII:
+        MOV BYTE PTR [BX], ASCII_NULL
+        INC BX
+        CMP BX, CX
+        JNE InitDisplayASCII
+    
+    POP CX
+    POP BX
     RET
 
-DisplayInit ENDP
+InitDisplay ENDP
 
 
-; DisplayTimerEventHandler
-;
-; Description:      This function should be called on timer interrupt to output
-;                   the display buffer onto the physical display.
-;
-; Operation:        At each call, this function reads the pattern for one of
-;                   the displays indexed by the shared variable display_index
-;                   and outputs the pattern to the corresponding display.
-;                   It then increments the display_index and wraps it around
-;                   to 0 so that the index cycles from 0 to NUM_DIGITS - 1.
-;
-; Arguments:        None.
-;
-; Return Value:     None.
-;
-; Local Variables:  None.
-;
-; Shared Variables: display_buffer
-;                   display_index
-;
-; Global Variables: None.
-;
-; Input:            None.
-;
-; Output:           Display.
-;
-; Error Handling:   None.
-;
-; Algorithms:       None.
-;
-; Data Structures:  None.
-;
-; Registers Used:   None.
-;
-; Stack Depth:      4 words: 4 registers pushed.
-;
-; Author:           Archan Luhar
-; Last Modified:    11/18/2013
-
-DisplayTimerEventHandler    PROC    NEAR
-                            PUBLIC  DisplayTimerEventHandler
-    DisplayTimerEventHandlerInit:
-        PUSH AX                             ; Save registers
-        PUSH BX
-        PUSH DX
-        PUSH SI
-
-        MOV BX, OFFSET(display_buffer)      ; Get display buffer address
-        MOV SI, display_index               ; SI = display index
-
-        SHL SI, 1                           ; SI = buffer offset = SI * 2
-                                            ; (BYTES_IN_WORD = 
-                                            ;  2 bytes per buffer word)
-
-        MOV AX, [BX][SI]                    ; AX = character pattern
-        XCHG AH, AL                         ; AL = 14 segment modifier pattern
-                                            ; AH = display pattern
-
-        SHR SI, 1                           ; SI = display index
-
-    DisplayUpdate:
-        MOV DX, LEDDisplay14                ; Set the 14 segment modifier
-        OUT DX, AL
-
-                                            ; AX = pattern . modifier
-        SHR AX, BYTE_BITS                   ; AX =       0 . pattern
-                                            ;                AL = pattern
-        
-        MOV DX, LEDDisplay                  ; Set the current LED display
-        ADD DX, SI                          ; Make sure to offset by the index
-        OUT DX, AL
-
-
-    DisplayIndexUpdate:
-        INC SI                              ; Increment the display index
-        CMP SI, NUM_DIGITS                  ; If not reached max,
-        JB  SkipDisplayIndexWrap            ; don't wrap around.
-
-    DisplayIndexWrap:
-        MOV SI, 0                           ; Else, wrap the digit index back to
-                                            ; 0.
-
-    SkipDisplayIndexWrap:
-    EndDisplayTimerEventHandler:
-        MOV display_index, SI               ; Update the shared variable
-                                            ; display_index =
-                                            ;   display_index + 1 mod NUM_DIGITS
-
-        POP SI                              ; Restore registers
-        POP DX
-        POP BX
-        POP AX
-        RET
-
-DisplayTimerEventHandler ENDP
 
 ; Display
 ;
@@ -417,21 +338,121 @@ DisplayHex  PROC    NEAR
 DisplayHex ENDP
 
 
+
+; DisplayTimerEventHandler
+;
+; Description:      This function should be called on timer interrupt to output
+;                   the display buffer onto the physical display.
+;
+; Operation:        At each call, this function reads the pattern for one of
+;                   the displays indexed by the shared variable display_index
+;                   and outputs the pattern to the corresponding display.
+;                   It then increments the display_index and wraps it around
+;                   to 0 so that the index cycles from 0 to NUM_DIGITS - 1.
+;
+; Arguments:        None.
+;
+; Return Value:     None.
+;
+; Local Variables:  None.
+;
+; Shared Variables: display_buffer
+;                   display_index
+;
+; Global Variables: None.
+;
+; Input:            None.
+;
+; Output:           Display.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+;
+; Data Structures:  None.
+;
+; Registers Used:   None.
+;
+; Stack Depth:      4 words: 4 registers pushed.
+;
+; Author:           Archan Luhar
+; Last Modified:    11/18/2013
+
+DisplayTimerEventHandler    PROC    NEAR
+                            PUBLIC  DisplayTimerEventHandler
+    DisplayTimerEventHandlerInit:
+        PUSH AX                             ; Save registers
+        PUSH BX
+        PUSH DX
+        PUSH SI
+
+        MOV BX, OFFSET(display_buffer)      ; Get display buffer address
+        MOV SI, display_index               ; SI = display index
+
+        SHL SI, 1                           ; SI = buffer offset = SI * 2
+                                            ; (BYTES_IN_WORD = 
+                                            ;  2 bytes per buffer word)
+
+        MOV AX, [BX][SI]                    ; AX = character pattern
+        XCHG AH, AL                         ; AL = 14 segment modifier pattern
+                                            ; AH = display pattern
+
+        SHR SI, 1                           ; SI = display index
+
+    DisplayUpdate:
+        MOV DX, LEDDisplay14                ; Set the 14 segment modifier
+        OUT DX, AL
+
+                                            ; AX = pattern . modifier
+        SHR AX, BYTE_BITS                   ; AX =       0 . pattern
+                                            ;                AL = pattern
+        
+        MOV DX, LEDDisplay                  ; Set the current LED display
+        ADD DX, SI                          ; Make sure to offset by the index
+        OUT DX, AL
+
+
+    DisplayIndexUpdate:
+        INC SI                              ; Increment the display index
+        CMP SI, NUM_DIGITS                  ; If not reached max,
+        JB  SkipDisplayIndexWrap            ; don't wrap around.
+
+    DisplayIndexWrap:
+        MOV SI, 0                           ; Else, wrap the digit index back to
+                                            ; 0.
+
+    SkipDisplayIndexWrap:
+    EndDisplayTimerEventHandler:
+        MOV display_index, SI               ; Update the shared variable
+                                            ; display_index =
+                                            ;   display_index + 1 mod NUM_DIGITS
+
+        POP SI                              ; Restore registers
+        POP DX
+        POP BX
+        POP AX
+        RET
+
+DisplayTimerEventHandler ENDP
+
+
 CODE ENDS
+
 
 
 DATA SEGMENT PUBLIC 'DATA'
 
     ; Stores the representation of the current display
-    display_buffer DW   9   DUP (BLANK_DISPLAY)
+    display_buffer DW   NUM_DIGITS   DUP (?)
     
-    ; The timer handler keeps track of which display to OUTput to next
-    display_index  DW   1   DUP (0)
+    ; The display timer handler keeps track of which display to OUTput to next
+    display_index  DW   ?
     
     ; A space allocated to read/write temporary ascii strings for the display
-    display_ascii  DB   9   DUP (BLANK_DISPLAY)
+    display_ascii  DB   NUM_DIGITS   DUP (?)
 
 DATA ENDS
+
 
 
     END

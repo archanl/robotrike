@@ -46,8 +46,6 @@ CODE    SEGMENT PUBLIC 'CODE'
 ; Author:            Glen George, Archan Luhar
 ; Last Modified:     Nov. 18, 2013
 
-InitDisplayCS   PROC    NEAR
-                PUBLIC  InitDisplayCS
 InitCS          PROC    NEAR
                 PUBLIC  InitCS
 
@@ -67,7 +65,6 @@ InitCS          PROC    NEAR
     RET
 
 InitCS          ENDP
-InitDisplayCS   ENDP
 
 
 

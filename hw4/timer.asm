@@ -3,7 +3,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;                                                                            ;
 ;                                    TIMER                                   ;
-;                      Timer and Interrupt Setup Functions                   ;
+;               Timer Initialization and Interrupt Setup Functions           ;
 ;                                   EE/CS 51                                 ;
 ;                                 Archan Luhar                               ;
 ;                                 TA: Joe Greef                              ;
@@ -42,9 +42,50 @@ CODE    SEGMENT PUBLIC 'CODE'
     EXTRN   DisplayTimerEventHandler:NEAR
 
 
-; SetDisplayTimerEventHandler/InstallTimer2EventHandler
+; InitTimer
 ;
-; Description:      Installs the timer 2 interrupt event handler into the
+; Description:      Calls functions that initialize timers and their event
+;                   handlers. MUST call this to use display and keypad routines.
+;
+; Operation:        Calls the event handler installer and interrupt setter.
+;
+; Arguments:        None.
+; Return Value:     None.
+;
+; Local Variables:  None.
+; Shared Variables: None.
+; Global Variables: None.
+;
+; Input:            None.
+; Output:           None.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+; Data Structures:  None.
+;
+; Registers Used:   None.
+; Stack Depth:      1 NEAR call.
+;
+; Author:           Archan Luhar
+; Last Modified:    Nov. 20, 2013
+InitTimer                   PROC    NEAR
+                            PUBLIC  InitTimer
+
+    CALL InstallTimerEventHandlers
+    CALL SetTimerInterrupts
+    
+    RET
+
+InitTimer                   ENDP
+
+
+
+; InstallTimerEventHandlers
+;
+; IMPORTANT NOTE:   CURRENLTY ONLY TIMER 2.
+;
+; Description:      Installs the timer interrupt event handlers into the
 ;                   interrupt vector table.
 ;
 ; Operation:        Writes the segment and and offset of the handler to the
@@ -71,10 +112,8 @@ CODE    SEGMENT PUBLIC 'CODE'
 ; Author:           Glen George, Archan Luhar
 ; Last Modified:    Nov. 18, 2013
 
-SetDisplayTimerEventHandler PROC    NEAR
-                            PUBLIC  SetDisplayTimerEventHandler
-InstallTimer2EventHandler   PROC    NEAR
-                            PUBLIC  InstallTimer2EventHandler
+InstallTimerEventHandlers   PROC    NEAR
+                            PUBLIC  InstallTimerEventHandlers
 
     PUSH AX                     ; Save Registers
     PUSH ES
@@ -89,16 +128,15 @@ InstallTimer2EventHandler   PROC    NEAR
     POP AX
     RET
 
-InstallTimer2EventHandler   ENDP
-SetDisplayTimerEventHandler ENDP
+InstallTimerEventHandlers   ENDP
 
 
 ; Timer2EventHandler
 ;
-; Description:      Handles the timer 2 interrupts. Calls the display handler.
+; Description:      Handles the timer 2 interrupts. Calls all functions that
+;                   rely on timer 2 events.
 ;
-; Operation:        Saves necessary registers.
-;                   Calls the display timer event handler.
+; Operation:        Calls the display timer event handler.
 ;                   Sends a timer EOI to the interrupt control register.
 ;                   Then returns using IRET.
 ;
@@ -141,7 +179,7 @@ Timer2EventHandler          PROC    NEAR
 Timer2EventHandler          ENDP
 
 
-; SetDisplayTimerInterrupt/InitTimer
+; SetTimerInterrupts
 ;
 ; IMPORTANT NOTE:   CURRENLTY ONLY INITIALIZES TIMER 2.
 ;
@@ -179,10 +217,8 @@ Timer2EventHandler          ENDP
 ; Author:           Glen George, Archan Luhar
 ; Last Modified:    Nov. 18, 2013
 
-SetDisplayTimerInterrupt    PROC    NEAR
-                            PUBLIC  SetDisplayTimerInterrupt
-InitTimer                   PROC    NEAR
-                            PUBLIC  InitTimer
+SetTimerInterrupts          PROC    NEAR
+                            PUBLIC  SetTimerInterrupts
 
         PUSH AX                     ; Save registers
         PUSH DX
@@ -212,8 +248,7 @@ InitTimer                   PROC    NEAR
 
         RET
 
-InitTimer                   ENDP
-SetDisplayTimerInterrupt    ENDP
+SetTimerInterrupts          ENDP
 
 
 CODE ENDS
