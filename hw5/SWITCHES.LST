@@ -1,0 +1,402 @@
+8086/87/88/186 MACRO ASSEMBLER    SWITCHES                                                 07:39:30  11/20/;3  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE SWITCHES
+OBJECT MODULE PLACED IN SWITCHES.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE SWITCHES.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1         NAME    SWITCHES
+                             2     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             3     ;                                                                            ;
+                             4     ;                                   SWITCHES                                 ;
+                             5     ;                               SWITCHES Routines                            ;
+                             6     ;                                   EE/CS 51                                 ;
+                             7     ;                                 Archan Luhar                               ;
+                             8     ;                                 TA: Joe Greef                              ;
+                             9     ;                                                                            ;
+                            10     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                            11     
+                            12     ; This file contains functions to handle a periodic timer event to update
+                            13     ; check key presses and execute the right key handler.
+                            14     ;
+                            15     ; The included public functions are:
+                            16     ;   - SwitchesTimerEventHandler
+                            17     ;           Checks the switches to see if any are pressed and debounces them and
+                            18     ;           calls the appropriate switch handler (currently just a test function
+                            19     ;           that enqueues the call arguments and displays them).
+                            20     ;
+                            21     ; Revision History:
+                            22     ;       11/19/2013      Archan Luhar    Finished event handler.
+                            23     
+                            24     ; local includes
+                            25 +1  $INCLUDE(general.inc)
+                      =1    26     ; General Definitions
+  0000                =1    27     ASCII_NULL      EQU     0
+  0002                =1    28     BYTES_IN_WORD   EQU     2
+  0008                =1    29     BYTE_BITS       EQU     8               ; Number of bits in a byte
+                            30 +1  $INCLUDE(switches.inc)
+  0080                =1    31     FIRST_SWITCHES_ROW          EQU     80H ; address of first switch row input
+  0004                =1    32     SWITCHES_PER_ROW            EQU     4   ; number of columns
+  0004                =1    33     NUM_SWITCH_ROWS             EQU     4   ; number of rows
+                      =1    34     
+  0000                =1    35     NO_SWITCH_PRESSED           EQU     0   ; current_pressed_switch default value
+                      =1    36     
+                      =1    37     ; Debouncing and repeat times
+  0032                =1    38     KEY_PRESS_INIT_DEBOUNCE     EQU     50  ; ms
+  01F4                =1    39     KEY_REPEAT_DEBOUNCE         EQU     500 ; ms
+  0064                =1    40     KEY_REPEAT_RATE             EQU     100 ; ms
+                            41     
+                            42     
+                            43     CGROUP  GROUP   CODE
+                            44     DGROUP  GROUP   DATA
+----                        45     CODE    SEGMENT PUBLIC 'CODE'
+                            46             ASSUME  CS:CGROUP, DS:DGROUP, ES:NOTHING, SS:DGROUP
+                            47     
+                            48     ; External references
+                            49         EXTRN   EnqueueEvent:NEAR
+                            50     
+8086/87/88/186 MACRO ASSEMBLER    SWITCHES                                                 07:39:30  11/20/;3  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                            51     ; InitSwitches
+                            52     ;
+                            53     ; Description:      This function initializes the shared variables for the
+                            54     ;                   switch routines. MUST call this before calling any switch
+                            55     ;                   routine.
+                            56     ;
+                            57     ; Operation:        Initialize current_pressed_switch to 0 to define
+                            58     ;                   no switches pressed. (see DATA section)
+                            59     ;
+                            60     ; Arguments:        None.
+                            61     ;
+                            62     ; Return Value:     None.
+                            63     ;
+                            64     ; Local Variables:  None.
+                            65     ;
+                            66     ; Shared Variables: None.
+                            67     ;
+                            68     ; Global Variables: None.
+                            69     ;
+                            70     ; Input:            None.
+                            71     ;
+                            72     ; Output:           None.
+                            73     ;
+                            74     ; Error Handling:   None.
+                            75     ;
+                            76     ; Algorithms:       None.
+                            77     ;
+                            78     ; Data Structures:  None.
+                            79     ;
+                            80     ; Registers Used:   None.
+                            81     ;
+                            82     ; Stack Depth:      0.
+                            83     ;
+                            84     ; Author:           Archan Luhar
+                            85     ; Last Modified:    11/20/2013
+                            86     
+0000                        87     InitSwitches    PROC    NEAR
+                            88                     PUBLIC  InitSwitches
+                            89         
+0000 C60602000090   R       90         MOV current_pressed_switch, NO_SWITCH_PRESSED
+                            91         
+0006 C3                     92         RET
+                            93     
+                            94     InitSwitches    ENDP
+                            95     
+                            96     
+                            97     
+                            98     ; SwitchesTimerEventHandler
+                            99     ;
+                           100     ; Description:      This function handles the timer interrupt to
+                           101     ;                   manage the switch presses. This function should be called
+                           102     ;                   by a timer handler every 1 ms. It scans for pressed
+                           103     ;                   switches and calls the appropriate handler for the switch
+                           104     ;                   after debouncing the press.
+                           105     ;
+8086/87/88/186 MACRO ASSEMBLER    SWITCHES                                                 07:39:30  11/20/;3  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           106     ; Operation:        If switch was pressed recently:
+                           107     ;                       Checks if it still pressed. If not, it resets
+                           108     ;                           the current_pressed_switch variable.
+                           109     ;                       If so, checks if debounce countdown has reached zero.
+                           110     ;                           If debounce countdown ~= 0, it decrements it.
+                           111     ;                           If = 0, it decrements a key repeat countdown if
+                           112     ;                               that is not 0, else it calls the key handler and
+                           113     ;                               resets the key repeat countdown (debouncing it
+                           114     ;                               once).
+                           115     ;                   
+                           116     ;                   If switch is not pressed:
+                           117     ;                       It scans all the switch rows and sees if the last nibble
+                           118     ;                       has a pressed switch. Raw, the last nibble is all 1's
+                           119     ;                       if no switch is pressed. If the last switch in the row
+                           120     ;                       is pressed, the first nibble is 0.
+                           121     ;                       If it finds a row with a pressed switch, it records the
+                           122     ;                       row address and the row's data. It also resets
+                           123     ;                       the key press debounce and key repeat shared variables.
+                           124     ;
+                           125     ; Arguments:        None.
+                           126     ;
+                           127     ; Return Value:     None.
+                           128     ;
+                           129     ; Local Variables:  
+                           130     ;
+                           131     ; Shared Variables: current_pressed_switch
+                           132     ;                   switch_press_countdown
+                           133     ;                   current_pressed_row
+                           134     ;                   switch_press_repeat_countdown
+                           135     ;                   switch_press_repeat_debounced
+                           136     ;                   
+                           137     ;
+                           138     ; Global Variables: None.
+                           139     ;
+                           140     ; Input:            Switches.
+                           141     ;
+                           142     ; Output:           None.
+                           143     ;
+                           144     ; Error Handling:   None.
+                           145     ;
+                           146     ; Algorithms:       None.
+                           147     ;
+                           148     ; Data Structures:  None.
+                           149     ;
+                           150     ; Registers Used:   None.
+                           151     ;
+                           152     ; Stack Depth:      2 words + 1 possible NEAR call.
+                           153     ;
+                           154     ; Author:           Archan Luhar
+                           155     ; Last Modified:    11/20/2013
+                           156     
+0007                       157     SwitchesTimerEventHandler   PROC    NEAR
+                           158                                 PUBLIC  SwitchesTimerEventHandler
+                           159     
+0007 50                    160         PUSH AX                         ; Save registers        
+8086/87/88/186 MACRO ASSEMBLER    SWITCHES                                                 07:39:30  11/20/;3  PAGE    4
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0008 52                    161         PUSH DX
+                           162     
+0009                       163         WasSwitchPressed:                       ; Checks if switch was pressed.
+0009 8A260200       R      164             MOV AH, current_pressed_switch
+000D 84E4                  165             TEST AH, AH                         
+000F 7531                  166             JNZ SwitchWasPressed                ; If so, check debounce countdown
+                           167             ; JNZ SwitchWasNotPressed           ; else, scan the switches.
+                           168     
+                           169         
+0011                       170         SwitchWasNotPressed:
+0011                       171         ScanSwitches:
+0011 BA8000                172             MOV DX, FIRST_SWITCHES_ROW      ; Get address of first row of switches
+                           173     
+0014                       174         DeterminePressedRow:                ; Get row value and make it usable
+0014 EC                    175             IN AL, DX                               ; Read value from row
+0015 F6D0                  176             NOT AL                                  ; Invert value
+0017 C0E004                177             SHL AL, BYTE_BITS - SWITCHES_PER_ROW    ; Get relevant bits on left
+                           178             
+                           179             ; Shift relevant bits to left side of byte. If all were not pressed,
+                           180             ; the bits in the relevant nibble would be all 1's. NOT of that would be
+                           181             ; all 0's. Shifting those all the way to the left yields a 0 AL since
+                           182             ; shifting pushes 0's on the right.
+001A 741C                  183             JZ EndDeterminePressedRow       ; If no switch currently pressed, loop.
+                           184     
+001C                       185         SwitchPressed:                      ; Else store current info and end.
+001C 89160000       R      186             MOV current_pressed_row, DX     ; Store row address
+0020 A20200         R      187             MOV current_pressed_switch, AL  ; Store row value
+                           188             
+                           189             ; Reset the countdowns. Initially, only a debounce is needed.
+0023 C70606003200   R      190             MOV switch_press_countdown, KEY_PRESS_INIT_DEBOUNCE
+0029 C70604000000   R      191             MOV switch_press_repeat_countdown, 0        ; 0's indicate false
+002F C60603000090   R      192             MOV switch_press_repeat_debounced, 0
+0035 EB6390                193             JMP EndSwitchesTimerEventHandler
+                           194         
+0038                       195         EndDeterminePressedRow:
+0038 42                    196             INC DX                                          ; Move on to next row.
+0039 81FA8400              197             CMP DX, FIRST_SWITCHES_ROW + NUM_SWITCH_ROWS    ; If switch row within
+003D 72D5                  198             JB DeterminePressedRow                          ; upper bound, loop.
+003F EB5990                199             JMP EndSwitchesTimerEventHandler                ; Else, wait till
+                           200                                                             ; next iteration.
+                           201     
+                           202     
+0042                       203         SwitchWasPressed:
+0042                       204         CheckDebounce:
+0042 8B160600       R      205             MOV DX, switch_press_countdown
+0046 85D2                  206             TEST DX, DX                         ; If debounce countdown has reached
+0048 7407                  207             JZ CheckCurrentSwitchState          ; zero, check the switch now.
+                           208             ; JNZ UpdateDebounceCountdown
+                           209     
+004A                       210         UpdateDebounceCountdown:
+004A FF0E0600       R      211             DEC switch_press_countdown          ; If not, decrement countdown
+004E EB4A90                212             JMP EndSwitchesTimerEventHandler    ; and wait till next iteration.
+                           213         
+0051                       214         CheckCurrentSwitchState:                ; Debounce countdown is done.
+0051 8B160000       R      215             MOV DX, current_pressed_row         ; Get the row the switch was in.
+8086/87/88/186 MACRO ASSEMBLER    SWITCHES                                                 07:39:30  11/20/;3  PAGE    5
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0055 EC                    216             IN AL, DX                           ; Get the current value of that row.
+0056 F6D0                  217             NOT AL                              ; Invert the value.
+0058 C0E004                218             SHL AL, BYTE_BITS - SWITCHES_PER_ROW; Get relevant bits on left.
+                           219     
+005B 3AE0                  220             CMP AH, AL                          ; Compare row pattern to when it
+005D 7409                  221             JE SwitchStillPressed               ; was pressed. If same, evaluate.
+                           222             ; JNE ResetSwitches                 
+                           223         
+005F                       224         ResetSwitches:                          ; If changed, invalidate and reset.
+005F C60602000090   R      225             MOV current_pressed_switch, NO_SWITCH_PRESSED
+0065 EB3390                226             JMP EndSwitchesTimerEventHandler    ; End and wait for next iteration.
+                           227     
+0068                       228         SwitchStillPressed:                     ; If switch is still pressed,
+0068 8B1E0400       R      229             MOV BX, switch_press_repeat_countdown   ; check to wait for repeat.
+006C 85DB                  230             TEST BX, BX
+006E 7407                  231             JZ CallSwitchEvent                  ; If repeat countdown is 0, call.
+                           232         
+0070                       233         UpdateRepeatCountdown:                  ; If not, decrement repeat countdown
+0070 FF0E0400       R      234             DEC switch_press_repeat_countdown   ; and wait for next iteration.
+0074 EB2490                235             JMP EndSwitchesTimerEventHandler
+                           236     
+0077                       237         CallSwitchEvent:                        ; Handles key press event calling.
+0077 E82300                238             CALL SwitchEventHandler             ; Args: Row address=DX, val=AH
+007A 8A160300       R      239             MOV DL, switch_press_repeat_debounced   ; If key repeating has been
+007E 84D2                  240             TEST DL, DL                             ; already "debounced" then
+0080 750F                  241             JNZ ResetRepeatWithoutDebounce          ; Reset key repeating.
+                           242             ; JZ ResetRepeatWithDebounce            ; Else reset it with added time.
+                           243         
+0082                       244         ResetRepeatWithDebounce:
+0082 C70604005802   R      245             MOV switch_press_repeat_countdown, KEY_REPEAT_RATE + KEY_REPEAT_DEBOUNCE
+0088 C60603000190   R      246             MOV switch_press_repeat_debounced, 1    ; Mark repeating debounced.
+008E EB0A90                247             JMP EndSwitchesTimerEventHandler
+                           248         
+0091                       249         ResetRepeatWithoutDebounce:
+0091 C70604006400   R      250             MOV switch_press_repeat_countdown, KEY_REPEAT_RATE
+0097 EB0190                251             JMP EndSwitchesTimerEventHandler
+                           252     
+                           253     
+009A                       254         EndSwitchesTimerEventHandler:
+009A 5A                    255             POP DX                              ; Restore registers and return
+009B 58                    256             POP AX
+009C C3                    257             RET
+                           258     
+                           259     SwitchesTimerEventHandler   ENDP
+                           260     
+                           261     
+                           262     ; SwitchEventHandler
+                           263     ;
+                           264     ; Description:      This function calls the appropriate handler for the key.
+                           265     ;                   Currently it calls the test EnqueueEvent function with
+                           266     ;                   the key number indexed by 0 as its code and number.
+                           267     ;
+                           268     ; Operation:        Calculates switch number as follows:
+                           269     ;                   row = row address - first row address
+                           270     ;                   col = SWITCHES_PER_ROW - # of left shits to enable sign bit
+8086/87/88/186 MACRO ASSEMBLER    SWITCHES                                                 07:39:30  11/20/;3  PAGE    6
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           271     ;                   switch number = NUM_SWITCH_ROWS * col + row
+                           272     ;                   Calls EnqueueEvent with switch number in AH and AL.
+                           273     ;
+                           274     ; Arguments:        DX = Row address
+                           275     ;                   AH = Row value (1011 means all but third switch pressed)
+                           276     ;
+                           277     ; Return Value:     None.
+                           278     ;
+                           279     ; Local Variables:  DL = row
+                           280     ;                   DX = col
+                           281     ;                   AH, AL = switch #, switch #: argument to enqueue function
+                           282     ;
+                           283     ; Shared Variables: None.
+                           284     ;
+                           285     ; Global Variables: None.
+                           286     ;
+                           287     ; Input:            None.
+                           288     ;
+                           289     ; Output:           None.
+                           290     ;
+                           291     ; Error Handling:   None.
+                           292     ;
+                           293     ; Algorithms:       None.
+                           294     ;
+                           295     ; Data Structures:  None.
+                           296     ;
+                           297     ; Registers Used:   None.
+                           298     ;
+                           299     ; Stack Depth:      3 words.
+                           300     ;
+                           301     ; Author:           Archan Luhar
+                           302     ; Last Modified:    11/20/2013
+                           303     
+009D                       304     SwitchEventHandler          PROC NEAR
+                           305                                 PUBLIC SwitchEventHandler
+                           306         
+009D                       307         InitSwitchEventHandler:
+009D 50                    308             PUSH AX
+009E 52                    309             PUSH DX
+009F 53                    310             PUSH BX
+                           311         
+00A0                       312         DetermineSwitchRow:
+00A0 81EA8000              313             SUB DX, FIRST_SWITCHES_ROW      ; DX contains row number 0,1,..
+                           314         
+00A4                       315         DetermineSwitchColumn:
+00A4 B703                  316             MOV BH, SWITCHES_PER_ROW - 1
+00A6 84E4                  317             TEST AH, AH
+00A8 7808                  318             JS EndSwitchEventHandler
+00AA                       319         DetermineSwitchColumnLoop:
+00AA FECF                  320             DEC BH
+00AC D0E4                  321             SHL AH, 1
+00AE 7802                  322             JS EndSwitchEventHandler
+00B0 EBF8                  323             JMP DetermineSwitchColumnLoop
+                           324         
+                           325         ; 
+8086/87/88/186 MACRO ASSEMBLER    SWITCHES                                                 07:39:30  11/20/;3  PAGE    7
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           326         ; AH = AL
+00B2                       327         EndSwitchEventHandler:
+00B2 8AE7                  328             MOV AH, BH
+00B4 C0E402                329             SHL AH, 2
+00B7 02E2                  330             ADD AH, DL
+00B9 8AC4                  331             MOV AL, AH
+                           332     
+00BB E80000         E      333             CALL EnqueueEvent
+                           334             
+00BE 5B                    335             POP BX
+00BF 5A                    336             POP DX
+00C0 58                    337             POP AX
+                           338             
+00C1 C3                    339             RET
+                           340             
+                           341     SwitchEventHandler          ENDP
+                           342     
+                           343     
+                           344     
+                           345     
+----                       346     CODE ENDS
+                           347     
+                           348     
+----                       349     DATA SEGMENT PUBLIC 'DATA'
+                           350     
+0000 ????                  351         current_pressed_row             DW  ?
+0002 ??                    352         current_pressed_switch          DB  ?
+0003 ??                    353         switch_press_repeat_debounced   DB  ?
+0004 ????                  354         switch_press_repeat_countdown   DW  ?
+0006 ????                  355         switch_press_countdown          DW  ?
+                           356     
+----                       357     DATA ENDS
+                           358     
+                           359     
+                           360         END
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

@@ -1,0 +1,115 @@
+8086/87/88/186 MACRO ASSEMBLER    HW5MAIN                                                  07:39:28  11/20/;3  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE HW5MAIN
+OBJECT MODULE PLACED IN HW5MAIN.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE HW5MAIN.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1         NAME    HW5MAIN
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                                   HW5MAIN                                  ;
+                             6     ;                               Homework 5 Main                              ;
+                             7     ;                                  EE/CS 51                                  ;
+                             8     ;                                 Archan Luhar                               ;
+                             9     ;                                 TA: Joe Greef                              ;
+                            10     ;                                                                            ;
+                            11     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                            12     
+                            13     ; Description:      This program initializes the proper hardware and memory
+                            14     ;                   for the purpose of testing out reading the target board's
+                            15     ;                   switches on the keypad.
+                            16     ;                   This main file calls a test function in order to initialize
+                            17     ;                   the testing environment. Calls are made by the switch
+                            18     ;                   routines to another test function EnqueueEvent which
+                            19     ;                   uses the display routines to display information about
+                            20     ;                   the key presses. Make sure debouncing and keypress-repeat
+                            21     ;                   work!
+                            22     ;
+                            23     ; Input:            Switches.
+                            24     ; Output:           Display.
+                            25     ;
+                            26     ; User Interface:   None.
+                            27     ;
+                            28     ; Error Handling:   None.
+                            29     ;
+                            30     ; Algorithms:       None.
+                            31     ; Data Structures:  None.
+                            32     ;
+                            33     ; Known Bugs:       None.
+                            34     ; Limitations:      None.
+                            35     ;
+                            36     ; Revision History:
+                            37     ;    11/19/13  Archan Luhar     Created hw5main.asm. Contains main function
+                            38     ;                               that calls chip initialization functions, and
+                            39     ;                               test function..
+                            40     
+                            41     
+                            42     CGROUP  GROUP   CODE
+                            43     DGROUP  GROUP   DATA, STACK
+                            44     
+                            45     
+----                        46     CODE    SEGMENT PUBLIC 'CODE'
+                            47         ASSUME  CS:CGROUP, DS:DGROUP, ES:NOTHING, SS:DGROUP
+                            48     
+                            49     
+                            50     ; External references
+8086/87/88/186 MACRO ASSEMBLER    HW5MAIN                                                  07:39:28  11/20/;3  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                            51         EXTRN   InitCS:NEAR
+                            52         EXTRN   InitTimer:NEAR
+                            53         EXTRN   InitSwitches:NEAR
+                            54         EXTRN   InitDisplay:NEAR
+                            55         EXTRN   KeyTest:NEAR
+                            56     
+                            57     
+0000                        58     START:  
+0000                        59     MAIN:
+0000 B8----         R       60         MOV     AX, DGROUP              ; Initialize the stack pointer
+0003 8ED0                   61         MOV     SS, AX
+0005 BCE00190       R       62         MOV     SP, OFFSET(DGROUP:TopOfStack)
+                            63     
+0009 B8----         R       64         MOV     AX, DGROUP              ; Initialize the data segment
+000C 8ED8                   65         MOV     DS, AX
+                            66     
+000E E80000         E       67         CALL    InitCS                  ; Initialize chip selects
+0011 E80000         E       68         CALL    InitTimer               ; Initialize timer handlers and controllers
+0014 E80000         E       69         CALL    InitDisplay             ; Initialize display variables
+0017 E80000         E       70         CALL    InitSwitches            ; Initialize switches variables
+                            71         
+001A FB                     72         STI                             ; Enable interrupts so event handlers can
+                            73                                         ; function.
+                            74         
+001B E80000         E       75         CALL    KeyTest                 ; Test function will setup test environment
+                            76     
+                            77         
+----                        78     CODE ENDS
+                            79     
+                            80     
+----                        81     DATA    SEGMENT PUBLIC  'DATA'
+                            82     
+                            83         ; Nothing in the data segment but need it for initializing DS
+                            84     
+----                        85     DATA    ENDS
+                            86     
+                            87     
+----                        88     STACK SEGMENT STACK 'STACK'
+                            89     
+0000 (80                    90         DB      80 DUP ('Stack ')       ; 240 words
+     537461636B20
+     )
+                            91     
+01E0                        92     TopOfStack      LABEL   WORD
+----                        93     STACK  ENDS
+                            94     
+                            95     
+                            96         END START
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND
