@@ -134,10 +134,11 @@ InstallTimerEventHandlers   ENDP
 
 ; Timer2EventHandler
 ;
-; Description:      Handles the timer 2 interrupts. Calls the display handler.
+; Description:      Handles the timer 2 interrupts. Calls all functions that
+;                   rely on timer 2 events.
 ;
-; Operation:        Saves necessary registers.
-;                   Calls the display timer event handler.
+; Operation:        Calls the display timer event handler.
+;                   Calls the switches timer event handler.
 ;                   Sends a timer EOI to the interrupt control register.
 ;                   Then returns using IRET.
 ;
@@ -157,7 +158,7 @@ InstallTimerEventHandlers   ENDP
 ; Data Structures:  None.
 ;
 ; Registers Used:   None.
-; Stack Depth:      0 words
+; Stack Depth:      2 words and a NEAR call.
 ;
 ; Author:           Glen George, Archan Luhar
 ; Last Modified:    Nov. 18, 2013
@@ -214,7 +215,7 @@ Timer2EventHandler          ENDP
 ; Data Structures:  None.
 ;
 ; Registers Used:   None.
-; Stack Depth:      0 words
+; Stack Depth:      2 words.
 ;
 ; Author:           Glen George, Archan Luhar
 ; Last Modified:    Nov. 18, 2013

@@ -156,7 +156,7 @@ InstallTimerEventHandlers   ENDP
 ; Data Structures:  None.
 ;
 ; Registers Used:   None.
-; Stack Depth:      0 words
+; Stack Depth:      2 words and a NEAR call.
 ;
 ; Author:           Glen George, Archan Luhar
 ; Last Modified:    Nov. 18, 2013
@@ -212,7 +212,7 @@ Timer2EventHandler          ENDP
 ; Data Structures:  None.
 ;
 ; Registers Used:   None.
-; Stack Depth:      0 words
+; Stack Depth:      2 words
 ;
 ; Author:           Glen George, Archan Luhar
 ; Last Modified:    Nov. 18, 2013
