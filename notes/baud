@@ -1,0 +1,19 @@
+setting baud rate is critical code.
+
+turn off interrupt
+set dlab bit
+set baud rate
+turn on interrupts
+
+note:
+divider = 18.432 MHz / (32 * baud)
+
+LINe high ready to receive:
+IN 14
+get IIR (interrupt type)
+call appropriate function
+
+kick start: turn off serial interrupt and then turn on when interrupt already
+dealt with but new byte put into queue
+one way to make it non-critical-code.
+
