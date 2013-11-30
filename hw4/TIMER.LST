@@ -1,4 +1,4 @@
-8086/87/88/186 MACRO ASSEMBLER    TIMER                                                    08:10:03  11/20/;3  PAGE    1
+8086/87/88/186 MACRO ASSEMBLER    TIMER                                                    13:36:15  11/27/;3  PAGE    1
 
 
 DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE TIMER
@@ -58,7 +58,7 @@ LOC  OBJ                  LINE     SOURCE
                       =1    48     
                       =1    49     ; Timer Addresses
   FF66                =1    50     Tmr2Ctrl        EQU     0FF66H          ; Timer 2 Control Register
-8086/87/88/186 MACRO ASSEMBLER    TIMER                                                    08:10:03  11/20/;3  PAGE    2
+8086/87/88/186 MACRO ASSEMBLER    TIMER                                                    13:36:15  11/27/;3  PAGE    2
 
 
 LOC  OBJ                  LINE     SOURCE
@@ -118,7 +118,7 @@ LOC  OBJ                  LINE     SOURCE
                            103     ; Author:           Archan Luhar
                            104     ; Last Modified:    Nov. 20, 2013
 0000                       105     InitTimer                   PROC    NEAR
-8086/87/88/186 MACRO ASSEMBLER    TIMER                                                    08:10:03  11/20/;3  PAGE    3
+8086/87/88/186 MACRO ASSEMBLER    TIMER                                                    13:36:15  11/27/;3  PAGE    3
 
 
 LOC  OBJ                  LINE     SOURCE
@@ -178,7 +178,7 @@ LOC  OBJ                  LINE     SOURCE
 0014 26C7064E00---- R      158         MOV     ES: WORD PTR (4 * Tmr2Vec + 2), SEG(Timer2EventHandler)
                            159     
 001B 07                    160         POP ES
-8086/87/88/186 MACRO ASSEMBLER    TIMER                                                    08:10:03  11/20/;3  PAGE    4
+8086/87/88/186 MACRO ASSEMBLER    TIMER                                                    13:36:15  11/27/;3  PAGE    4
 
 
 LOC  OBJ                  LINE     SOURCE
@@ -238,7 +238,7 @@ LOC  OBJ                  LINE     SOURCE
                            213     
                            214     
                            215     ; SetTimerInterrupts
-8086/87/88/186 MACRO ASSEMBLER    TIMER                                                    08:10:03  11/20/;3  PAGE    5
+8086/87/88/186 MACRO ASSEMBLER    TIMER                                                    13:36:15  11/27/;3  PAGE    5
 
 
 LOC  OBJ                  LINE     SOURCE
@@ -298,7 +298,7 @@ LOC  OBJ                  LINE     SOURCE
 003F B801E0                268             MOV     AX, Tmr2CtrlVal
 0042 EE                    269             OUT     DX, AL
                            270                                         ; Initialize interrupt controller for timers
-8086/87/88/186 MACRO ASSEMBLER    TIMER                                                    08:10:03  11/20/;3  PAGE    6
+8086/87/88/186 MACRO ASSEMBLER    TIMER                                                    13:36:15  11/27/;3  PAGE    6
 
 
 LOC  OBJ                  LINE     SOURCE

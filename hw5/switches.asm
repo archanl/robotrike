@@ -224,7 +224,7 @@ SwitchesTimerEventHandler   PROC    NEAR
         JMP EndSwitchesTimerEventHandler
 
     CallSwitchEvent:                        ; Handles key press event calling.
-        CALL SwitchEventHandler             ; Args: Row address=DX, val=AH
+        CALL SwitchEventHandler             ; Args: Row address=DX, val=AL
         MOV DL, switch_press_repeat_debounced   ; If key repeating has been
         TEST DL, DL                             ; already "debounced" then
         JNZ ResetRepeatWithoutDebounce          ; Reset key repeating.
@@ -261,7 +261,7 @@ SwitchesTimerEventHandler   ENDP
 ;                   Calls EnqueueEvent with switch number in AH and AL.
 ;
 ; Arguments:        DX = Row address
-;                   AH = Row value (1011 means all but third switch pressed)
+;                   AL = Row value (1011 means all but third switch pressed)
 ;
 ; Return Value:     None.
 ;
@@ -302,22 +302,23 @@ SwitchEventHandler          PROC NEAR
         SUB DX, FIRST_SWITCHES_ROW      ; DX contains row number 0,1,..
     
     DetermineSwitchColumn:
-        MOV BH, SWITCHES_PER_ROW - 1
-        TEST AH, AH
+        MOV BL, SWITCHES_PER_ROW - 1
+        TEST AL, AL
         JS EndSwitchEventHandler
     DetermineSwitchColumnLoop:
-        DEC BH
-        SHL AH, 1
+        DEC BL
+        SHL AL, 1
         JS EndSwitchEventHandler
         JMP DetermineSwitchColumnLoop
     
-    ; 
-    ; AH = AL
+    ; AH = Switch Event
+	; AL = Switch number
     EndSwitchEventHandler:
-        MOV AH, BH
-        SHL AH, 2
-        ADD AH, DL
-        MOV AL, AH
+        MOV AL, BL
+        SHL AL, 2
+        ADD AL, DL
+        
+		MOV AH, SWITCH_PRESS_EVENT
 
         CALL EnqueueEvent
         

@@ -1,0 +1,130 @@
+8086/87/88/186 MACRO ASSEMBLER    HW5MAIN                                                  17:40:29  11/29/;3  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE HW5MAIN
+OBJECT MODULE PLACED IN HW5MAIN2.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE HW5MAIN2.ASM M1 EP DB
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1         NAME    HW5MAIN
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                                   HW5MAIN                                  ;
+                             6     ;                        Homework 5 Main 2 - No Display                      ;
+                             7     ;                                   EE/CS 51                                 ;
+                             8     ;                                 Archan Luhar                               ;
+                             9     ;                                 TA: Joe Greef                              ;
+                            10     ;                                                                            ;
+                            11     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                            12     
+                            13     ; Description:      This program initializes the proper hardware and memory
+                            14     ;                   for the purpose of testing out reading the target board's
+                            15     ;                   switches on the keypad.
+                            16     ;                   This main file goes into an infinite loop so that the user
+                            17     ;                                       can halt and read the buffer written to by En
+                                   queueEvent when
+                            18     ;                                       keys are pressed. dump EventBuf 100H to read 
+                                   test buffer.
+                            19     ;                                       To be used with HW5TEST.
+                            20     ;
+                            21     ; Input:            Switches.
+                            22     ; Output:           Display.
+                            23     ;
+                            24     ; User Interface:   None.
+                            25     ;
+                            26     ; Error Handling:   None.
+                            27     ;
+                            28     ; Algorithms:       None.
+                            29     ; Data Structures:  None.
+                            30     ;
+                            31     ; Known Bugs:       None.
+                            32     ; Limitations:      None.
+                            33     ;
+                            34     ; Revision History:
+                            35     ;       11/19/13        Archan Luhar    Created hw5main.asm. Contains main function
+                            36     ;                               that calls chip initialization functions, and
+                            37     ;                               test function..
+                            38     ;       11/27/13        Archan Luhar    Doesn't call function in HW54TEST. To be used
+                            39     ;                                                               with HW5TEST and key 
+                                   presses read in buffer.
+                            40     
+                            41     
+                            42     CGROUP  GROUP   CODE
+                            43     DGROUP  GROUP   DATA, STACK
+                            44     
+                            45     
+----                        46     CODE    SEGMENT PUBLIC 'CODE'
+                            47         ASSUME  CS:CGROUP, DS:DGROUP, ES:NOTHING, SS:DGROUP
+8086/87/88/186 MACRO ASSEMBLER    HW5MAIN                                                  17:40:29  11/29/;3  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                            48     
+                            49     
+                            50     ; External references
+                            51         EXTRN   InitCS:NEAR
+                            52         EXTRN   InitTimer:NEAR
+                            53         EXTRN   InitSwitches:NEAR
+                            54         EXTRN   InitDisplay:NEAR
+                            55     
+                            56     
+0000                        57     START:  
+0000                        58     MAIN:
+0000 B8----         R       59         MOV     AX, DGROUP              ; Initialize the stack pointer
+0003 8ED0                   60         MOV     SS, AX
+0005 BCE00190       R       61         MOV     SP, OFFSET(DGROUP:TopOfStack)
+                            62     
+0009 B8----         R       63         MOV     AX, DGROUP              ; Initialize the data segment
+000C 8ED8                   64         MOV     DS, AX
+                            65     
+000E E80000         E       66         CALL    InitCS                  ; Initialize chip selects
+0011 E80000         E       67         CALL    InitTimer               ; Initialize timer handlers and controllers
+0014 E80000         E       68         CALL    InitDisplay             ; Initialize display variables
+0017 E80000         E       69         CALL    InitSwitches            ; Initialize switches variables
+                            70         
+001A FB                     71         STI                             ; Enable interrupts so event handlers can
+                            72                                         ; function.
+                            73     
+001B                        74     EndlessLoop:
+001B EBFE                   75             JMP EndlessLoop                                 ; Infinite loop to wait for k
+                                   ey presses
+                            76                                                                             ; that get wr
+                                   itten to a buffer by the test
+                            77                                                                             ; file.
+                            78     
+001D                        79     EndMain:        
+001D F4                     80             HLT
+                            81     
+                            82         
+----                        83     CODE ENDS
+                            84     
+                            85     
+----                        86     DATA    SEGMENT PUBLIC  'DATA'
+                            87     
+                            88         ; Nothing in the data segment but need it for initializing DS
+                            89     
+----                        90     DATA    ENDS
+                            91     
+                            92     
+----                        93     STACK SEGMENT STACK 'STACK'
+                            94     
+0000 (80                    95         DB      80 DUP ('Stack ')       ; 240 words
+     537461636B20
+     )
+                            96     
+01E0                        97     TopOfStack      LABEL   WORD
+----                        98     STACK  ENDS
+8086/87/88/186 MACRO ASSEMBLER    HW5MAIN                                                  17:40:29  11/29/;3  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                            99     
+                           100     
+                           101         END START
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

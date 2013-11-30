@@ -5,7 +5,7 @@ OUTPUT FILE: HW5MAIN
 CONTROLS SPECIFIED IN INVOCATION COMMAND:
   
 
-DATE:  11/20/;3  TIME:  08:11:13
+DATE:  11/29/;3  TIME:  17:52:27
 WARNING 63:  SS AND SP REGISTERS NOT INITIALIZED
 WARNING 64:  DS REGISTER NOT INITIALIZED
 
@@ -145,19 +145,20 @@ BASE    OFFSET TYPE SYMBOL               BASE    OFFSET TYPE SYMBOL
 0020H   03A2H  SYM  RESETREPEATWITHD     0020H   03B1H  SYM  RESETREPEATWITHO
                    -EBOUNCE                                 -UTDEBOUNCE
 0020H   037FH  SYM  RESETSWITCHES        0020H   0331H  SYM  SCANSWITCHES
-0069H   0026H  SYM  SWITCH_PRESS_COU     0069H   0024H  SYM  SWITCH_PRESS_REP
-                   -NTDOWN                                  -EAT_COUNTDOWN
-0069H   0023H  SYM  SWITCH_PRESS_REP     0000H   0004H  SYM  SWITCHES_PER_ROW
-                   -EAT_DEBOUNCED                                         
-0020H   0327H  SYM  SWITCHESTIMEREVE     0020H   03BDH  SYM  SWITCHEVENTHANDL
-                   -NTHANDLER                               -ER
-0020H   033CH  SYM  SWITCHPRESSED        0020H   0388H  SYM  SWITCHSTILLPRESS
-                                                            -ED
-0020H   0331H  SYM  SWITCHWASNOTPRES     0020H   0362H  SYM  SWITCHWASPRESSED
-                   -SED                                         
-0020H   036AH  SYM  UPDATEDEBOUNCECO     0020H   0390H  SYM  UPDATEREPEATCOUN
-                   -UNTDOWN                                 -TDOWN
-0020H   0329H  SYM  WASSWITCHPRESSED
+0069H   0026H  SYM  SWITCH_PRESS_COU     0000H   0000H  SYM  SWITCH_PRESS_EVE
+                   -NTDOWN                                  -NT
+0069H   0024H  SYM  SWITCH_PRESS_REP     0069H   0023H  SYM  SWITCH_PRESS_REP
+                   -EAT_COUNTDOWN                           -EAT_DEBOUNCED
+0000H   0004H  SYM  SWITCHES_PER_ROW     0020H   0327H  SYM  SWITCHESTIMEREVE
+                                                            -NTHANDLER
+0020H   03BDH  SYM  SWITCHEVENTHANDL     0020H   033CH  SYM  SWITCHPRESSED
+                   -ER                                         
+0020H   0388H  SYM  SWITCHSTILLPRESS     0020H   0331H  SYM  SWITCHWASNOTPRES
+                   -ED                                      -SED
+0020H   0362H  SYM  SWITCHWASPRESSED     0020H   036AH  SYM  UPDATEDEBOUNCECO
+                                                            -UNTDOWN
+0020H   0390H  SYM  UPDATEREPEATCOUN     0020H   0329H  SYM  WASSWITCHPRESSED
+                   -TDOWN                                         
 
 
 MEMORY MAP OF MODULE HW5MAIN

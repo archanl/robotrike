@@ -1,4 +1,4 @@
-8086/87/88/186 MACRO ASSEMBLER    HW4MAIN                                                  08:10:01  11/20/;3  PAGE    1
+8086/87/88/186 MACRO ASSEMBLER    HW4MAIN                                                  13:36:13  11/27/;3  PAGE    1
 
 
 DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE HW4MAIN
@@ -58,7 +58,7 @@ LOC  OBJ                  LINE     SOURCE
                             48         EXTRN   InitTimer:NEAR
                             49         EXTRN   InitDisplay:NEAR
                             50         EXTRN   DisplayTest:NEAR
-8086/87/88/186 MACRO ASSEMBLER    HW4MAIN                                                  08:10:01  11/20/;3  PAGE    2
+8086/87/88/186 MACRO ASSEMBLER    HW4MAIN                                                  13:36:13  11/27/;3  PAGE    2
 
 
 LOC  OBJ                  LINE     SOURCE

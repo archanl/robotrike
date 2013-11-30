@@ -1,4 +1,4 @@
-8086/87/88/186 MACRO ASSEMBLER    CONVERTS                                                 08:10:03  11/20/;3  PAGE    1
+8086/87/88/186 MACRO ASSEMBLER    CONVERTS                                                 13:36:15  11/27/;3  PAGE    1
 
 
 DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE CONVERTS
@@ -58,7 +58,7 @@ LOC  OBJ                  LINE     SOURCE
                             48     ; Return Value:     Resulting hexadecimal representation ASCII string is written
                             49     ;                   at SI.
                             50     ;
-8086/87/88/186 MACRO ASSEMBLER    CONVERTS                                                 08:10:03  11/20/;3  PAGE    2
+8086/87/88/186 MACRO ASSEMBLER    CONVERTS                                                 13:36:15  11/27/;3  PAGE    2
 
 
 LOC  OBJ                  LINE     SOURCE
@@ -118,7 +118,7 @@ LOC  OBJ                  LINE     SOURCE
                            103     
 001B 8BDA                  104         MOV BX, DX                      ; Save next argument n mod pwr 10 in BX
                            105     
-8086/87/88/186 MACRO ASSEMBLER    CONVERTS                                                 08:10:03  11/20/;3  PAGE    3
+8086/87/88/186 MACRO ASSEMBLER    CONVERTS                                                 13:36:15  11/27/;3  PAGE    3
 
 
 LOC  OBJ                  LINE     SOURCE
@@ -178,7 +178,7 @@ LOC  OBJ                  LINE     SOURCE
                            158     ; Hex2String
                            159     ;
                            160     ; Description:      This function is used to create a hexadecimal ascii string
-8086/87/88/186 MACRO ASSEMBLER    CONVERTS                                                 08:10:03  11/20/;3  PAGE    4
+8086/87/88/186 MACRO ASSEMBLER    CONVERTS                                                 13:36:15  11/27/;3  PAGE    4
 
 
 LOC  OBJ                  LINE     SOURCE
@@ -238,7 +238,7 @@ LOC  OBJ                  LINE     SOURCE
 0067 C1EA04                213         SHR DX, 4                       ; If not, shift the mask
 006A 80C1FC                214         ADD CL, -4                      ; and correct the number of bits to right.
 006D EBF4                  215         JMP FindFirstNonZeroLoop
-8086/87/88/186 MACRO ASSEMBLER    CONVERTS                                                 08:10:03  11/20/;3  PAGE    5
+8086/87/88/186 MACRO ASSEMBLER    CONVERTS                                                 13:36:15  11/27/;3  PAGE    5
 
 
 LOC  OBJ                  LINE     SOURCE

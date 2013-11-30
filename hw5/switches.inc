@@ -8,3 +8,5 @@ NO_SWITCH_PRESSED           EQU     0   ; current_pressed_switch default value
 KEY_PRESS_INIT_DEBOUNCE     EQU     50  ; ms
 KEY_REPEAT_DEBOUNCE         EQU     500 ; ms
 KEY_REPEAT_RATE             EQU     100 ; ms
+
+SWITCH_PRESS_EVENT          EQU     0   ; Pass to EnqueueEvent in AH
