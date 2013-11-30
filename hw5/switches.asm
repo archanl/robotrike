@@ -23,6 +23,8 @@
 ;
 ; Revision History:
 ;       11/20/2013      Archan Luhar    Finished switches.
+;       11/29/2013      Archan Luhar    Passes switch press event constant to
+;                                       EnqueueEvent instead of key number.
 
 ; local includes
 $INCLUDE(general.inc)
@@ -36,6 +38,8 @@ CODE    SEGMENT PUBLIC 'CODE'
 
 ; External references
     EXTRN   EnqueueEvent:NEAR
+
+
 
 ; InitSwitches
 ;
@@ -258,7 +262,8 @@ SwitchesTimerEventHandler   ENDP
 ;                   row = row address - first row address
 ;                   col = SWITCHES_PER_ROW - # of left shits to enable sign bit
 ;                   switch number = NUM_SWITCH_ROWS * col + row
-;                   Calls EnqueueEvent with switch number in AH and AL.
+;                   Calls EnqueueEvent with switch number AL and switch event in
+;                   AH.
 ;
 ; Arguments:        DX = Row address
 ;                   AL = Row value (1011 means all but third switch pressed)
@@ -267,7 +272,7 @@ SwitchesTimerEventHandler   ENDP
 ;
 ; Local Variables:  DL = row
 ;                   DX = col
-;                   AH, AL = switch #, switch #: argument to enqueue function
+;                   AH, AL = Key Event, switch #: argument to EnqueueEvent
 ;
 ; Shared Variables: None.
 ;
@@ -283,18 +288,21 @@ SwitchesTimerEventHandler   ENDP
 ;
 ; Data Structures:  None.
 ;
+; Limitations:      Uses shift left 2 to multiply by 4 (number of rows).
+;                   If don't want it to be hard coded, then use MUL by num rows.
+;
 ; Registers Used:   None.
 ;
 ; Stack Depth:      3 words.
 ;
 ; Author:           Archan Luhar
-; Last Modified:    11/20/2013
+; Last Modified:    11/29/2013
 
 SwitchEventHandler          PROC NEAR
                             PUBLIC SwitchEventHandler
     
     InitSwitchEventHandler:
-        PUSH AX
+        PUSH AX                         ; Save registers
         PUSH DX
         PUSH BX
     
@@ -302,27 +310,27 @@ SwitchEventHandler          PROC NEAR
         SUB DX, FIRST_SWITCHES_ROW      ; DX contains row number 0,1,..
     
     DetermineSwitchColumn:
-        MOV BL, SWITCHES_PER_ROW - 1
-        TEST AL, AL
-        JS EndSwitchEventHandler
+        MOV BL, SWITCHES_PER_ROW - 1    ; Determine column by testing high bit
+        TEST AL, AL                     ; (sign) and decrementing row counter BL
+        JS EndSwitchEventHandler        ; when shifting left the row value.
     DetermineSwitchColumnLoop:
         DEC BL
         SHL AL, 1
-        JS EndSwitchEventHandler
+        JS EndSwitchEventHandler        ; Found column with 1 bit.
         JMP DetermineSwitchColumnLoop
     
     ; AH = Switch Event
-	; AL = Switch number
+    ; AL = Switch number
     EndSwitchEventHandler:
         MOV AL, BL
         SHL AL, 2
-        ADD AL, DL
+        ADD AL, DL                      ; Key number = AL = column * 4 + row
         
-		MOV AH, SWITCH_PRESS_EVENT
+        MOV AH, SWITCH_PRESS_EVENT      ; Event code = AH = switch press event
 
-        CALL EnqueueEvent
+        CALL EnqueueEvent               ; Calls the event handler queueing fnc.
         
-        POP BX
+        POP BX                          ; Restore registers
         POP DX
         POP AX
         
@@ -338,11 +346,11 @@ CODE ENDS
 
 DATA SEGMENT PUBLIC 'DATA'
 
-    current_pressed_row             DW  ?
-    current_pressed_switch          DB  ?
-    switch_press_repeat_debounced   DB  ?
-    switch_press_repeat_countdown   DW  ?
-    switch_press_countdown          DW  ?
+    current_pressed_row             DW  ?   ; Address of row currently pressed
+    current_pressed_switch          DB  ?   ; Value of pressed row. (0 if none)
+    switch_press_repeat_debounced   DB  ?   ; Boolean: key repeat debounced?
+    switch_press_repeat_countdown   DW  ?   ; Countdown for key repeat
+    switch_press_countdown          DW  ?   ; Countdown for key debounce
 
 DATA ENDS
 

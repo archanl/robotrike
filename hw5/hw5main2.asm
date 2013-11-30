@@ -14,9 +14,9 @@
 ;                   for the purpose of testing out reading the target board's
 ;                   switches on the keypad.
 ;                   This main file goes into an infinite loop so that the user
-;					can halt and read the buffer written to by EnqueueEvent when
-;					keys are pressed. dump EventBuf 100H to read test buffer.
-;					To be used with HW5TEST.
+;                   can halt and read the buffer written to by EnqueueEvent when
+;                   keys are pressed. dump EventBuf 100H to read test buffer.
+;                   To be used with HW5TEST.
 ;
 ; Input:            Switches.
 ; Output:           Display.
@@ -32,11 +32,11 @@
 ; Limitations:      None.
 ;
 ; Revision History:
-; 	11/19/13  	Archan Luhar	Created hw5main.asm. Contains main function
+;   11/19/13    Archan Luhar    Created hw5main.asm. Contains main function
 ;                               that calls chip initialization functions, and
 ;                               test function..
-;	11/27/13	Archan Luhar	Doesn't call function in HW54TEST. To be used
-;								with HW5TEST and key presses read in buffer.
+;   11/27/13    Archan Luhar    Doesn't call function in HW54TEST. To be used
+;                               with HW5TEST and key presses read in buffer.
 
 
 CGROUP  GROUP   CODE
@@ -72,12 +72,12 @@ MAIN:
                                     ; function.
 
 EndlessLoop:
-	JMP EndlessLoop					; Infinite loop to wait for key presses
-									; that get written to a buffer by the test
-									; file.
+    JMP EndlessLoop                 ; Infinite loop to wait for key presses
+                                    ; that get written to a buffer by the test
+                                    ; file.
 
-EndMain:	
-	HLT
+EndMain:
+    HLT
 
     
 CODE ENDS
