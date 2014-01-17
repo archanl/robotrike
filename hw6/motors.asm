@@ -11,7 +11,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; This file contains functions to handle a periodic timer event to update
-; check key presses and execute the right key handler.
+; the parallel output to the motors and the laser.
 ;
 ; The included public functions are:
 ;   - SwitchesTimerEventHandler
@@ -23,10 +23,12 @@
 ;           Currently only calls test EnqueueEvent function.
 ;
 ; Revision History:
-;       11/29/2013      Archan Luhar    Finished switches.
+;       11/29/2013      Archan Luhar    Started Motors.
+;
 
 ; local includes
 $INCLUDE(general.inc)
+$INCLUDE(simpmac.inc)
 $INCLUDE(motors.inc)
 
 
@@ -36,8 +38,96 @@ CODE    SEGMENT PUBLIC 'CODE'
         ASSUME  CS:CGROUP, DS:DGROUP, ES:NOTHING, SS:DGROUP
 
 ; External references
-    EXTRN   EnqueueEvent:NEAR
+    EXTRN   Cos_Table:NEAR
+    EXTRN   Sin_Table:NEAR
+
+
+
     
+; SetMotorSpeed
+;
+; Description:      This function initializes the memory for shared variables
+;                   used by the parallel port functions. This function must be
+;                   called prior to using motors and lasers. It also initalizes
+;                   the control register for the parallel port.
+;
+; Operation:        Sets the shared variables to their default values.
+;                   Output control register value to parallel register.
+;
+; Arguments:        None.
+;
+; Return Value:     None.
+;
+; Local Variables:  None.
+;
+; Shared Variables: pulseWidths (WRITE)
+;                   driveSpeed (WRITE)
+;                   driveAngle (WRITE)
+;                   parallelPortB (WRITE)
+;                   pulseWidthCounter (WRITE)
+;                   pulseWidthM1 (WRITE)
+;                   pulseWidthM2 (WRITE)
+;                   pulseWidthM3 (WRITE)
+;                   f1_X (WRITE)
+;                   f1_Y (WRITE)
+;                   f2_X (WRITE)
+;                   f2_Y (WRITE)
+;                   f3_X (WRITE)
+;                   f3_Y (WRITE)
+;
+; Global Variables: None.
+;
+; Input:            None.
+;
+; Output:           PARALLEL_CTRL_REG
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+;
+; Data Structures:  None.
+;
+; Registers Used:   None.
+;
+; Stack Depth:      2 words
+;
+; Author:           Archan Luhar
+; Last Modified:    11/30/2013
+InitParallel    PROC NEAR
+                PUBLIC InitParallel
+
+    PUSH AX
+    PUSH DX
+
+    MOV DX, PARALLEL_CTRL_REG
+    MOV AX, PARALLEL_CTRL_VAL
+    OUT DX, AL
+
+    MOV driveSpeed, STATIONARY_SPEED
+    MOV driveAngle, DEFAULT_ANGLE
+    MOV laserStatus, LASER_OFF
+
+    MOV pulseWidthCounter, MINIMUM_ACTIVE_PULSE_WIDTH
+    MOV pulseWidthM1, INACTIVE_MOTOR_PULSE_WIDTH
+    MOV pulseWidthM2, INACTIVE_MOTOR_PULSE_WIDTH
+    MOV pulseWidthM3, INACTIVE_MOTOR_PULSE_WIDTH
+    
+    MOV f1_X, INIT_F1_X
+    MOV f1_Y, INIT_F1_Y
+    MOV f2_X, INIT_F2_X
+    MOV f2_Y, INIT_F2_Y
+    MOV f3_X, INIT_F3_X
+    MOV f3_Y, INIT_F3_Y
+
+    MOV parallelPortB, DEFAULT_PARALLEL_PORTB
+
+    POP DX
+    POP AX
+
+    RET
+
+InitParallel    ENDP
+
     
 ; SetMotorSpeed
 ;
@@ -50,18 +140,17 @@ CODE    SEGMENT PUBLIC 'CODE'
 ;                   direction on the RoboTrike.
 ;
 ; Operation:        Sets the motor pulse timeout counts to to the speed
-;                   in the direction of their spin. The shared variables
-;                   motor1_count, motor2_count, and motor3_count are set in a
-;                   specific ratio as determined by the following geometry.
+;                   in the direction of their spin. The shared variables are set
+;                   in a specific ratio as determined by the following geometry.
 ;                                   
 ;                                             --- M1 --- +
 ;
 ;                                                  r    +S
 ;                                                  | a /
-;                                       +          |  /       +
+;                                       +          |  /       /
 ;                                        \         | /       /
-;                                         \M2             M2/
-;                                          \               /
+;                                         \M3             M2/
+;                                          \               +
 ;
 ;                   Let a be the angle in degrees from the reference line r.
 ;                   Let S be the speed.
@@ -72,17 +161,19 @@ CODE    SEGMENT PUBLIC 'CODE'
 ;                   pulse more often. The counts are to be incremented in
 ;                   MotorTimerEventHandler.
 ;
-; Arguments:        AX = speed
-;                   BX = direction
+; Arguments:        AX = speed [0, 65534] corresponding to -> [0, 255].
+;                   BX = amgle [0, 65534] corresponding to -> [0, 360).
+;                   A max integer means do not change the respective
+;                   property (speed, direction).
 ;
 ; Return Value:     None.
 ;
 ; Local Variables:  None.
 ;
-; Shared Variables: motor_info       2 word array
-;                   motor_speeds     3 word array
-;                   motor_directions 3 byte array
-;                   motor_counts     3 word array
+; Shared Variables: pulseWidths (WRITE)
+;                   driveSpeed (READ/WRITE)
+;                   driveAngle (READ/WRITE)
+;                   parallelPortB (WRITE)
 ;
 ; Global Variables: None.
 ;
@@ -101,23 +192,93 @@ CODE    SEGMENT PUBLIC 'CODE'
 ; Stack Depth:      .
 ;
 ; Author:           Archan Luhar
-; Last Modified:    11/18/2013
-;
-; Pseudocode
-; ----------
-;                   motor_speeds[1] = motor_counts[1] = |S * sin(angle)     |
-;                   motor_speeds[2] = motor_counts[2] = |S * cos(angle - 30)|
-;                   motor_speeds[3] = motor_speeds[3] = |S * cos(angle + 30)|
-;                   motor_directions[1] = sign(S * sin(angle))
-;                   motor_directions[2] = sign(S * cos(angle - 30))
-;                   motor_directions[3] = sign(S * cos(angle + 30))
-;                   
-;                   motor_info[speed] = S
-;                   motor_info[direction] = angle
-;
+; Last Modified:    11/30/2013
+
+SetMotorSpeed   PROC NEAR
+                PUBLIC SetMotorSpeed
+
+    InitSetMotorSpeed:
+        PUSHA
 
 
-; MotorTimerEventHandler
+    CheckSpeedChange:
+        CMP AX, NO_CHANGE_VALUE     ; If speed is maxed, don't change speed
+        JNE SpeedChanged
+    KeepCurrentSpeed:               ; Get current speed for calculations
+        MOV AX, driveSpeed
+        JMP CheckAngleChange
+    SpeedChanged:                   ; Else, store speed given
+        MOV driveSpeed, AX
+        ; JMP CheckAngleChange
+
+    CheckAngleChange:
+        CMP BX, NO_CHANGE_VALUE     ; Same as with speed, don't change if max
+        JNE AngleChanged
+    KeepCurrentAngle:
+        MOV BX, driveAngle
+        JMP NormalizeSpeed
+    AngleChanged:
+        MOV driveAngle, BX
+        ; JMP NormalizeSpeed
+
+
+    NormalizeSpeed:                 ; Lose precision in speed but needed to make
+        SHR AX, 1                   ; sign positive for signed multiplication.
+        MOV CX, AX                  ; CX = speed
+
+
+    NormalizeAngle360:
+        MOV AX, BX                  ; AX = angle
+        MOV BX, ANGLE_NORMALIZER
+        XOR DX, DX                  ; Zero out DX to divide angle by normalizer
+        DIV BX          ; AX = angle / normalizer = normalized angle
+    GetAngleTableOffset:
+        SHL AX, 1                   ; AX = angle * 2 (byte offset in word table)
+        MOV BX, AX                  ; BX = byte offset into trig word table
+
+        
+    ; Get signed velocity components: speed_x, speed_y in DI, SI respectively
+    GetXYSpeeds:
+        MOV AX, CS:[BX + OFFSET(Cos_Table)]             ; DI = cos(angle)
+        IMUL CX                     ; DX | AX = cos(angle) (AX) * speed (CX)
+        MOV DI, DX                  ; DI = speed_x
+        
+        MOV AX, CS:[BX + OFFSET(Sin_Table)]             ; SI = sin(angle)
+        IMUL CX                     ; DX | AX = sin(angle) (AX) * speed (CX)
+        MOV SI, DX                  ; SI = speed_y
+
+        
+    ; Writes motor pulse widths and directions.
+    ; Dots the velocity vector with the motor force vector (result in AX)
+    ; Then writes the normalized pulse width based on the speed (reads AX)
+    ; Then writes to the mask ()
+    SetupDirectionBitMask:
+        XOR BL, BL
+    SetMotor1:
+        %DOTPRODUCT(DI, SI, f1_X, f1_Y)                 ; Motor 1 speed (+/-)
+        %WRITEPULSEWIDTH(pulseWidthM1)                  ; width[0] = abs(speed)
+        %UPDATEDIRECTIONBITMASK(M1_DIRECITON_BIT)       ; forward if +, back -
+    SetMotor2:
+        %DOTPRODUCT(DI, SI, f2_X, f2_Y)                 ; Motor 2 speed (+/-)
+        %WRITEPULSEWIDTH(pulseWidthM2)                  ; width[1] = abs(speed)
+        %UPDATEDIRECTIONBITMASK(M2_DIRECITON_BIT)       ; forward if +, back -
+    SetMotor3:
+        %DOTPRODUCT(DI, SI, f3_X, f3_Y)                 ; Motor 3 speed (+/-)
+        %WRITEPULSEWIDTH(pulseWidthM3)                  ; width[2] = abs(speed)
+        %UPDATEDIRECTIONBITMASK(M3_DIRECITON_BIT)       ; forward if +, back -
+    WriteDirectionBitMask:
+        AND parallelPortB, MOTORS_CLR_DIR_MASK      ; Clears direction bits        
+        OR  parallelPortB, BL                       ; Sets proper direction bits
+
+    EndSetMotorSpeed:
+        POPA
+        RET
+
+SetMotorSpeed   ENDP
+
+
+
+; ParallelTimerEventHandler
 ;
 ; Description:      Manages the motor counts and sends pulses to motors
 ;                   with a frequency depending on the direction and speed.
@@ -132,9 +293,9 @@ CODE    SEGMENT PUBLIC 'CODE'
 ;
 ; Local Variables:  None.
 ;
-; Shared Variables: motor_speeds     3 word array
-;                   motor_directions 3 byte array
-;                   motor_counts     3 word array
+; Shared Variables: pulseWidthCounter (READ/WRITE)
+;                   pulseWidths (READ)
+;                   laserStatus (READ)
 ;
 ; Global Variables: None.
 ;
@@ -150,19 +311,78 @@ CODE    SEGMENT PUBLIC 'CODE'
 ;
 ; Registers Used:   None.
 ;
-; Stack Depth:      .
+; Stack Depth:      3 words
 ;
 ; Author:           Archan Luhar
-; Last Modified:    11/18/2013
-;
-; Pseudocode
-; 
-; for i in range(num_motors):
-;       if motor_speeds[i] > ZERO_THRESHOLD:
-;           motor_counts[i] += motor_speeds[i]
-;           if overflow:
-;               Pulse motor i in direction motor_directions[i]
-;           
+; Last Modified:    11/30/2013
+
+ParallelTimerEventHandler   PROC NEAR
+                            PUBLIC ParallelTimerEventHandler
+
+    InitParallelTimerEventHandler:
+        PUSH AX
+        PUSH CX
+        PUSH DX
+
+    LoadParallelBufferAndPulseWidthCounter:
+        XOR AH, AH
+        MOV AL, parallelPortB               ; Load the parallel port B buffer
+        AND AL, PARALLEL_CLR_POW_MASK       ; Clear motor and laser power bits
+        MOV CL, pulseWidthCounter           ; Load the pulse width counter
+
+
+    ; Motor Pulses: Turn on power when pulse width is <= pulseWidthCounter
+    Motor1Pulse:
+        CMP pulseWidthM1, CL                ; Check if counter is above width
+        JB Motor2Pulse                      ; Counter and widths both unsigned.
+        %SETBIT(AL, M1_POWER_BIT)           ; If <= set the power bit else skip.
+
+    Motor2Pulse:
+        CMP pulseWidthM2, CL
+        JB Motor3Pulse
+        %SETBIT(AL, M2_POWER_BIT)
+
+    Motor3Pulse:
+        CMP pulseWidthM3, CL
+        JB IncrementPulseWidthCounter
+        %SETBIT(AL, M3_POWER_BIT)
+
+    ; Done with pulses, increment counter and loop to MINIMUM_ACTIVE_PULSE_WIDTH
+    IncrementPulseWidthCounter:
+        INC CL
+        JNZ UpdatePulseWidthCounter
+        ; JS ResetPulseWidthCounter
+    ResetPulseWidthCounter:
+        MOV CL, MINIMUM_ACTIVE_PULSE_WIDTH
+    UpdatePulseWidthCounter:
+        MOV pulseWidthCounter, CL
+
+
+    ; Turn laser bit on if applicable
+    LaserToggle:
+        CMP laserStatus, LASER_OFF      ; If laser status is off,
+        JE OutputParallelFromBuffer     ; Keep laser bit off in buffer.
+        ; JNE TurnLaserOn
+
+    TurnLaserOn:
+        %SETBIT(AL, LASER_POWER_BIT)
+
+
+    ; Output the buffer that was just created to the port
+    OutputParallelFromBuffer:
+        MOV DX, PARALLEL_PORTB_REG      ; Output the buffer to parallel port B
+        OUT DX, AL
+    SaveParallelBuffer:
+        MOV parallelPortB, AL           ; Save the parallel port B buffer
+
+    EndParallelTimerEventHandler:
+        POP DX
+        POP CX                          ; Restore registers
+        POP AX
+
+        RET                             ; Return to timer handler manager
+
+ParallelTimerEventHandler   ENDP
 
 
 
@@ -178,7 +398,7 @@ CODE    SEGMENT PUBLIC 'CODE'
 ;
 ; Local Variables:  None.
 ;
-; Shared Variables: motor_info.
+; Shared Variables: driveSpeed
 ;
 ; Global Variables: None.
 ;
@@ -192,18 +412,21 @@ CODE    SEGMENT PUBLIC 'CODE'
 ;
 ; Data Structures:  None.
 ;
-; Registers Used:   AX, return value.
+; Registers Used:   AX.
 ;
-; Stack Depth:      .
+; Stack Depth:      0
 ;
 ; Author:           Archan Luhar
 ; Last Modified:    11/18/2013
-;
-; Pseudocode
-; ----------
-;
-; return motor_info[speed]
-;
+
+GetMotorSpeed   PROC NEAR
+                PUBLIC GetMotorSpeed
+
+    MOV AX, driveSpeed              ; Set laser status shared variable from AX
+    RET
+
+GetMotorSpeed   ENDP
+
 
 
 ; GetMotorDirection
@@ -234,16 +457,18 @@ CODE    SEGMENT PUBLIC 'CODE'
 ;
 ; Registers Used:   AX.
 ;
-; Stack Depth:      .
+; Stack Depth:      0
 ;
 ; Author:           Archan Luhar
 ; Last Modified:    11/18/2013
-;
-; Pseudocode
-; ----------
-;
-; return motor_info[direction]
-;
+
+GetMotorDirection   PROC NEAR
+                    PUBLIC GetMotorDirection
+
+    MOV AX, driveAngle              ; Set laser status shared variable from AX
+    RET
+
+GetMotorDirection   ENDP
 
 
 
@@ -251,8 +476,9 @@ CODE    SEGMENT PUBLIC 'CODE'
 ;
 ; Description:      Sets Laser on or off depending on a boolean argument.
 ;
-; Operation:        Sets the laser_on shared variable to the argument and
-;                   turns on/off laser.
+; Operation:        Sets the laserStatus shared variable from the AX argument.
+;                   The parallel timer event handler should read this boolean
+;                   to turn on and off the laser.
 ;
 ; Arguments:        AX = zero turns it off, nonzero turns it on
 ;
@@ -260,7 +486,7 @@ CODE    SEGMENT PUBLIC 'CODE'
 ;
 ; Local Variables:  None.
 ;
-; Shared Variables: laser_on
+; Shared Variables: laserStatus (WRITE)
 ;
 ; Global Variables: None.
 ;
@@ -276,30 +502,25 @@ CODE    SEGMENT PUBLIC 'CODE'
 ;
 ; Registers Used:   None.
 ;
-; Stack Depth:      .
+; Stack Depth:      0
 ;
 ; Author:           Archan Luhar
-; Last Modified:    11/18/2013
-;
-; Pseudocode
-; ----------
-;
-; turnOn = AX
-;
-; if turnOn:
-;       turn on laser
-; else:
-;       turn off laser
-;
-; laser_on = turnOn
-;
+; Last Modified:    11/30/2013
+
+SetLaser            PROC NEAR
+                    PUBLIC SetLaser
+
+    MOV laserStatus, AX             ; Set laser status shared variable from AX
+    RET
+
+SetLaser            ENDP
 
 
 ; GetLaser
 ;
 ; Description:      Returns zero if laser is off, else returns nonzero value.
 ;
-; Operation:        Reads the shared variable laser_on and returns it in AX.
+; Operation:        Reads the shared variable laserStatus and returns it in AX.
 ;
 ; Arguments:        None.
 ;
@@ -307,7 +528,7 @@ CODE    SEGMENT PUBLIC 'CODE'
 ;
 ; Local Variables:  None.
 ;
-; Shared Variables: laser_on
+; Shared Variables: laserStatus (READ)
 ;
 ; Global Variables: None.
 ;
@@ -323,7 +544,7 @@ CODE    SEGMENT PUBLIC 'CODE'
 ;
 ; Registers Used:   AX.
 ;
-; Stack Depth:      .
+; Stack Depth:      0
 ;
 ; Author:           Archan Luhar
 ; Last Modified:    11/29/2013
@@ -342,13 +563,28 @@ CODE ENDS
 
 DATA SEGMENT PUBLIC 'DATA'
 
-    pulseWidthCounter           Dw  ?
-    pulseWidths                 DW  NUM_MOTORS  DUP (?)
+    ; states of the motor and laser
     driveSpeed                  DW  ?
-    driveAngle                  DB  ?
-    laserStatus                 DB  ?
+    driveAngle                  DW  ?
+    laserStatus                 DW  ?
+
+    ; bit buffer for the parallel port b
+    parallelPortB               DB  ?   ; PARALLEL BUFFER
+
+    ; PWM variables
+    pulseWidthCounter           DB  ?   ; PULSE COUNTER AND PULSE WIDTHS
+    pulseWidthM1                DB  ?
+    pulseWidthM2                DB  ?
+    pulseWidthM3                DB  ?
     
-    
+    ; Force variables for the motor -- in case user wants to change them
+    ; A function would have to be implemented to set them.
+    f1_X                        DW ?
+    f1_Y                        DW ?
+    f2_X                        DW ?
+    f2_Y                        DW ?
+    f3_X                        DW ?
+    f3_Y                        DW ?
 
 DATA ENDS
 

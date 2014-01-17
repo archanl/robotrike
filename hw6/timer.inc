@@ -1,5 +1,13 @@
 ; Timer Interrupt Vector
+Tmr0Vec         EQU     8               ; Timer 0
 Tmr2Vec         EQU     19              ; Timer 2
+
+; Installs event handler 'event_handler' in vector number 'vector'
+; Assumes ES segment points to start of vector table
+%*DEFINE(InstallVector(vector, event_handler))   (
+    MOV     ES: WORD PTR (4 * %vector), OFFSET(%event_handler)
+    MOV     ES: WORD PTR (4 * %vector + 2), SEG(%event_handler)
+)
 
 
 ; Interrupt Controller Addresses
@@ -15,19 +23,37 @@ TimerEOI        EQU     00008H          ; Timer EOI command for all timers
 
 
 ; Timer Addresses
+Tmr0Ctrl        EQU     0FF56H          ; Timer 0 Control Register
+Tmr0MaxCntA     EQU     0FF52H          ; Timer 0 Max Count A Register
+Tmr0Count       EQU     0FF50H          ; Timer 0 Count Register
+
 Tmr2Ctrl        EQU     0FF66H          ; Timer 2 Control Register
 Tmr2MaxCnt      EQU     0FF62H          ; Timer 2 Max Count A Register
 Tmr2Count       EQU     0FF60H          ; Timer 2 Count Register
 
+
 ; Timer Control Register Value
-Tmr2CtrlVal     EQU     0E001H          ;1--- ---- ---- ----  enable timer
-                                        ;-1-- ---- ---- ----  write to control
-                                        ;--1- ---- ---- ----  enable interrupts
-                                        ;---- 0000 00-0 000-  reserved
-                                        ;---0 ---- --0- ----  read only
-                                        ;---- ---- ---- ---1  continuous mode
+Tmr0CtrlVal     EQU     0E001H          ; 1--- ---- ---- ----  Enable timer
+                                        ; -1-- ---- ---- ----  Write to control
+                                        ; --1- ---- ---- ----  Enable interrupts
+                                        ; ---- 0000 00-- ----  Reserved
+                                        ; ---0 ---- --0- ----  Read only
+                                        ; ---- ---- ---0 ----  TMRIN0 is enable
+                                        ; ---- ---- ---- 00--  No prescaling
+                                        ; ---- ---- ---- --0-  Single cntr mode
+                                        ; ---- ---- ---- ---1  Continuous mode
+
+Tmr2CtrlVal     EQU     0E001H          ;1--- ---- ---- ----  Enable timer
+                                        ;-1-- ---- ---- ----  Write to control
+                                        ;--1- ---- ---- ----  Enable interrupts
+                                        ;---- 0000 00-0 000-  Reserved
+                                        ;---0 ---- --0- ----  Read only
+                                        ;---- ---- ---- ---1  Continuous mode
 
 
-; Timing Definitions
-COUNTS_PER_MS   EQU     2304            ; Number of timer counts per 1 ms
-                                        ; (assumes 18.432 MHz clock)
+; Timing Definitions assuming 18.432 MHz clock
+COUNTS_PER_MS_DIV_4         EQU     576     ; Number of timer counts per 0.25 ms
+TIMER_0_MAX_COUNT_VAL       EQU     COUNTS_PER_MS_DIV_4
+
+COUNTS_PER_MS               EQU     2304    ; Number of timer counts per 1 ms
+TIMER_2_MAX_COUNT_VAL       EQU     COUNTS_PER_MS
