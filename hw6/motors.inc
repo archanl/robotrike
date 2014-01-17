@@ -4,7 +4,8 @@ MINIMUM_ACTIVE_PULSE_WIDTH  EQU 1       ; Pulse widths range from 0 to 255
 INACTIVE_MOTOR_PULSE_WIDTH  EQU 0       ; No pulses = 0 pulse width
 STATIONARY_SPEED            EQU 0       ; Default movement state
 DEFAULT_ANGLE               EQU 0       ; Default movement orientation state
-NO_CHANGE_VALUE             EQU 0FFFFH  ; Don't change if=angle/speed parameter
+NO_CHANGE_ANGLE             EQU -32768  ; Don't change if angle parameter is =
+NO_CHANGE_SPEED             EQU 65535  ; Don't change if speed parameter is =
 
 
 ; PARALLEL HARDWARE CONFIGURATION, OUTPUT SELECTORS, AND BEHAVIOR BITS:
@@ -52,7 +53,6 @@ LASER_OFF                   EQU 0
 
 
 
-
 ; SPEED AND ANGLE CALCULATION CONSTANTS
 ; -------------------------------------
 ; 360 * normalizer = 0FFFFH
@@ -89,18 +89,20 @@ INIT_F3_Y                   EQU 06ED9H
 ; Stores dotproduct of (x_reg, y_reg) and (f_x, f_y) in AX.
 ; Modifies register CX.
 %*DEFINE(DOTPRODUCT(x_reg, y_reg, f_x, f_y))   (
+        ; CX = force vector x times speed in x direction
         MOV AX, %x_reg
         IMUL %f_x
         MOV CX, DX
 
+        ; CX = CX + force vector y times speed in y direction
         MOV AX, %y_reg
         IMUL %f_y
         ADD CX, DX
 
+                        ; Correct for two multiplications (one for force and
+                        ; one for trig):
         SAL CX, 2       ; Q0.15 Floating point arithmetic shift
-        SHR CX, 7
-        SHR CL, 1
-        SHL CH, 6
+        SAR CX, 8       ; Arithmetically make CH fill CX
         MOV AX, CX      ; AX = [80, 7F] = [-128, 127]
 )
 

@@ -202,7 +202,7 @@ SetMotorSpeed   PROC NEAR
 
 
     CheckSpeedChange:
-        CMP AX, NO_CHANGE_VALUE     ; If speed is maxed, don't change speed
+        CMP AX, NO_CHANGE_SPEED     ; If speed is maxed, don't change speed
         JNE SpeedChanged
     KeepCurrentSpeed:               ; Get current speed for calculations
         MOV AX, driveSpeed
@@ -212,7 +212,7 @@ SetMotorSpeed   PROC NEAR
         ; JMP CheckAngleChange
 
     CheckAngleChange:
-        CMP BX, NO_CHANGE_VALUE     ; Same as with speed, don't change if max
+        CMP BX, NO_CHANGE_ANGLE     ; Same as with speed, don't change if max
         JNE AngleChanged
     KeepCurrentAngle:
         MOV BX, driveAngle
@@ -226,12 +226,26 @@ SetMotorSpeed   PROC NEAR
         SHR AX, 1                   ; sign positive for signed multiplication.
         MOV CX, AX                  ; CX = speed
 
+    NormalizeAngle:                 ; The following block of code normalizes
+        MOV AX, BX                  ; the given angle to be between 0 and 360
+        CMP AX, 0
+        JGE AngleIsPositive
+    AngleIsNegative:                ; If the angle given is negative then
+        NEG AX                      ; Make positive
+        XOR DX, DX
+        MOV BX, 360
+        DIV BX                      ; Divide by 360
+        MOV AX, DX                  ; Get the remainder
+        NEG AX                      ; Make negative again
+        ADD AX, 360                 ; Final angle is 360 - (given mod 360)
+        JMP GetAngleTableOffset
+    AngleIsPositive:
+        XOR DX, DX                  ; If angle is positive, get its mod 360
+        MOV BX, 360
+        DIV BX
+        MOV AX, DX                  ; Final angle is (given mod 360)
+        ;JMP GetAngleTableOffset
 
-    NormalizeAngle360:
-        MOV AX, BX                  ; AX = angle
-        MOV BX, ANGLE_NORMALIZER
-        XOR DX, DX                  ; Zero out DX to divide angle by normalizer
-        DIV BX          ; AX = angle / normalizer = normalized angle
     GetAngleTableOffset:
         SHL AX, 1                   ; AX = angle * 2 (byte offset in word table)
         MOV BX, AX                  ; BX = byte offset into trig word table
