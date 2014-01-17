@@ -1,0 +1,22 @@
+
+DOS 5.0 (038-N) 8086 LINKER, V2.7
+
+INPUT FILES: ECHO.OBJ, INIT.OBJ, POLLSER.OBJ
+OUTPUT FILE: ECHO.LNK
+CONTROLS SPECIFIED IN INVOCATION COMMAND:
+DATE:  01/16/;4  TIME:  21:38:26
+
+
+LINK MAP OF MODULE ECHO
+
+LOGICAL SEGMENTS INCLUDED:
+LENGTH ADDRESS ALIGN  SEGMENT         CLASS           OVERLAY
+ 0000H ------    G    ??SEG                                         
+ 00F9H ------    G    CODE            CODE                          
+ 0001H ------    G    DATA            DATA                          
+ 01E0H ------    G    STACK           STACK                         
+
+INPUT MODULES INCLUDED:
+ECHO.OBJ(ECHO)
+INIT.OBJ(INIT)
+POLLSER.OBJ(POLLSER)

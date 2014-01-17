@@ -1,0 +1,188 @@
+8086/87/88/186 MACRO ASSEMBLER    ECHO                                                     21:35:50  01/16/;4  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE ECHO
+OBJECT MODULE PLACED IN ECHO.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE ECHO.ASM
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1             NAME  ECHO
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                                     ECHO                                   ;
+                             6     ;                              Echo Program Demo                             ;
+                             7     ;                                                                            ;
+                             8     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             9     
+                            10     ; Description:      This program is a demonstration program to show polled
+                            11     ;                   serial I/O (actually this program does not assume polled
+                            12     ;                   serial I/O).  It echos any characters received on the
+                            13     ;                   serial port back to the serial port, converting lowercase
+                            14     ;                   characters to uppercase and leaving all other characters
+                            15     ;                   unchanged.  Note: the program is an infinite loop, there
+                            16     ;                   no way to exit it.
+                            17     ;
+                            18     ; Input:            Characters from the serial channel.
+                            19     ; Output:           The input characters are output to the serial channel with
+                            20     ;                   lowercase characters converted to uppercase.
+                            21     ;
+                            22     ; User Interface:   None, the input is echoed.
+                            23     ; Error Handling:   None.
+                            24     ;
+                            25     ; Algorithms:       None.
+                            26     ; Data Structures:  None.
+                            27     ;
+                            28     ; Limitations:      Assumes the ASCII character set.
+                            29     ;
+                            30     ; Revision History:
+                            31     ;    11/10/93  Glen George              initial revision
+                            32     ;    11/14/94  Glen George              added chip select initialization
+                            33     ;                                       added error checking on input
+                            34     ;                                       added Revision History section
+                            35     ;    11/13/95  Glen George              updated comments
+                            36     ;    11/11/96  Glen George              updated comments
+                            37     ;    11/19/97  Glen George              changed name of stack and code
+                            38     ;                                          segments to be compatible with C
+                            39     ;                                       changed the argument passing to
+                            40     ;                                          SerialPutChar to be compatible with
+                            41     ;                                          C code
+                            42     ;                                       added call to ClrIRQVectors in
+                            43     ;                                          initialization
+                            44     ;    12/26/99  Glen George              changed to using groups for the
+                            45     ;                                          segment registers to be compatible
+                            46     ;                                          with C
+                            47     ;                                       updated comments
+                            48     ;     1/30/02  Glen George              added proper assume for ES
+                            49     
+                            50     
+8086/87/88/186 MACRO ASSEMBLER    ECHO                                                     21:35:50  01/16/;4  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                            51     
+                            52     ; local include files
+                            53     ;   none
+                            54     
+                            55     
+                            56     
+                            57     
+                            58     ; setup code and data groups
+                            59     CGROUP  GROUP   CODE
+                            60     DGROUP  GROUP   DATA, STACK
+                            61     
+                            62     
+                            63     ; segment register assumptions
+                            64             ASSUME  CS:CGROUP, DS:DGROUP, ES:NOTHING, SS:DGROUP
+                            65     
+                            66     
+                            67     
+----                        68     CODE    SEGMENT PUBLIC 'CODE'
+                            69     
+                            70     
+                            71     
+                            72     ; function declarations
+                            73             EXTRN   InitCS:NEAR             ;initialize the PCS lines
+                            74             EXTRN   ClrIRQVectors:NEAR      ;setup the IRQ vector table
+                            75             EXTRN   InitSerialPort:NEAR     ;initialize the serial port
+                            76             EXTRN   SerialGetChar:NEAR      ;get a character from the serial port
+                            77             EXTRN   SerialPutChar:NEAR      ;output a character to the serial port
+                            78     
+                            79     
+                            80     
+                            81     
+0000                        82     StartEcho:      
+                            83     
+0000 B8----         R       84             MOV     AX, DGROUP              ;initialize the stack pointer
+0003 8ED0                   85             MOV     SS, AX
+0005 BCE00190       R       86             MOV     SP, OFFSET(DGROUP:TopOfStack)
+                            87     
+0009 B8----         R       88             MOV     AX, DGROUP              ;initialize the data segment
+000C 8ED8                   89             MOV     DS, AX
+                            90     
+                            91     
+000E E80000         E       92             CALL    InitCS                  ;initialize the chip selects
+0011 E80000         E       93             CALL    ClrIRQVectors           ;clear out the interrupt vector table
+                            94     
+0014 E80000         E       95             CALL    InitSerialPort          ;initialize the serial port
+                            96     
+                            97     
+0017                        98     CharacterLoop:                          ;now loop, getting and converting characters
+0017 E80000         E       99             CALL    SerialGetChar           ;get a character, checking for errors
+001A A90080                100             TEST    AX, 8000H               ;check for negative (error)
+001D 75F8                  101             JNZ     CharacterLoop           ;if there was an error, ignore the character
+                           102             ;JZ     ProcessCharacter        ;otherwise have a character, process it
+                           103     
+001F                       104     ProcessCharacter:                       ;convert lowercase to uppercase
+001F 3C61                  105             CMP     AL, 'a'                 ;check if lowercase (need to convert)
+8086/87/88/186 MACRO ASSEMBLER    ECHO                                                     21:35:50  01/16/;4  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+0021 7C06                  106             JL      OutputChar              ;< 'a' -- just output it
+0023 3C7A                  107             CMP     AL, 'z'
+0025 7F02                  108             JG      OutputChar              ;> 'z' -- just output it
+                           109             ;JLE    ConvertChar             ;else need to convert the character
+                           110     
+0027                       111     ConvertChar:                            ;convert from lowercase to uppercase -
+0027 2C20                  112             SUB     AL, 'a' - 'A'           ;   assumes ASCII
+                           113             ;JMP    OutputChar              ;converted the character, now output it
+                           114     
+0029                       115     OutputChar:                             ;output character to the serial port
+0029 50                    116             PUSH    AX                      ;put on stack for output routine
+002A E80000         E      117             CALL    SerialPutChar           ;output the character
+002D 58                    118             POP     AX                      ;clear the argument off the stack
+                           119     
+002E EBE7                  120             JMP     CharacterLoop           ;now loop forever
+                           121     
+                           122     
+0030                       123     EndEcho:                                ;end of echoing
+0030 F4                    124             HLT                             ;never executed
+                           125     
+                           126     
+                           127     
+                           128     
+----                       129     CODE    ENDS
+                           130     
+                           131     
+                           132     
+                           133     
+                           134     ;the data segment
+                           135     
+----                       136     DATA    SEGMENT PUBLIC  'DATA'
+                           137     
+                           138     
+                           139                     ;nothing in the data segment but need it for initializing DS
+                           140     
+                           141     
+----                       142     DATA    ENDS
+                           143     
+                           144     
+                           145     
+                           146     
+                           147     ;the stack
+                           148     
+----                       149     STACK           SEGMENT STACK  'STACK'
+                           150     
+0000 (80                   151                     DB      80 DUP ('Stack ')       ; 240 words for stack
+     537461636B20
+     )
+                           152     
+01E0                       153     TopOfStack      LABEL   WORD
+                           154     
+----                       155     STACK           ENDS
+                           156     
+                           157     
+                           158     
+8086/87/88/186 MACRO ASSEMBLER    ECHO                                                     21:35:50  01/16/;4  PAGE    4
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           159             END     StartEcho
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

@@ -1,0 +1,593 @@
+8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  21:38:18  01/16/;4  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE POLLSER
+OBJECT MODULE PLACED IN POLLSER.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE POLLSER.ASM
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1             NAME  POLLSER
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                                    POLLSER                                 ;
+                             6     ;                            Polled Serial I/O Demo                          ;
+                             7     ;                                                                            ;
+                             8     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             9     
+                            10     ; This file contains routines for doing polled serial I/O using an 82050.  The
+                            11     ; functions included are:
+                            12     ;    InitSerialPort  - initialize the serial channel
+                            13     ;    SerialInRdy     - determine if the serial channel has input data ready
+                            14     ;    SerialOutRdy    - determine if the serial channel is ready to transmit
+                            15     ;    SerialGetChar   - get a character from the serial channel
+                            16     ;    SerialPutChar   - output a character to the serial channel
+                            17     ;    SerialErrStatus - return and clear the serial error status
+                            18     ;
+                            19     ; Revision History:
+                            20     ;    11/10/93  Glen George              initial revision
+                            21     ;    11/14/94  Glen George              SerialGetChar and SerialPutChar now
+                            22     ;                                          use SerialInRdy and SerialOutRdy
+                            23     ;                                       updated comments
+                            24     ;                                       added Revision History section
+                            25     ;    11/11/96  Glen George              updated comments
+                            26     ;    11/19/97  Glen George              added SerialErrStatus function
+                            27     ;                                       changed argument passing and return
+                            28     ;                                          values to match C functions
+                            29     ;                                       changed code segment name to match C
+                            30     ;                                       added Shared Variables sections to
+                            31     ;                                          function headers
+                            32     ;    10/20/98  Glen George              changed InitSerialPort to always do
+                            33     ;                                          byte I/O
+                            34     ;                                       fixed bug in SerialGetChar (AH could
+                            35     ;                                          have been uninitialized on return)
+                            36     ;                                       updated comments
+                            37     ;    12/26/99  Glen George              changed to using groups for the
+                            38     ;                                          segment registers to be compatible
+                            39     ;                                          with C
+                            40     ;                                       updated comments
+                            41     ;     1/30/02  Glen George              added proper assume for ES
+                            42     ;     2/06/03  Glen George              now using the constants NO_ERROR and
+                            43     ;                                          GETCHAR_ERROR
+                            44     ;                                       updated comments
+                            45     
+                            46     
+                            47     
+                            48     ; local include files
+                            49 +1  $INCLUDE(SERIAL.INC)
+                      =1    50     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  21:38:18  01/16/;4  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                      =1    51     ;                                                                            ;
+                      =1    52     ;                                  SERIAL.INC                                ;
+                      =1    53     ;                            Polled Serial I/O Demo                          ;
+                      =1    54     ;                                 Include File                               ;
+                      =1    55     ;                                                                            ;
+                      =1    56     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    57     
+                      =1    58     ; This file contains the definitions for the serial I/O routines (in the file
+                      =1    59     ; POLLSER.ASM).  These definitions just cover the 16C450 Aynchronous
+                      =1    60     ; Communications Controller chip on the target board.  The definitions assume
+                      =1    61     ; the serial chip is selected with PCS3 (it is based at address 180H),
+                      =1    62     ;
+                      =1    63     ; Revision History:
+                      =1    64     ;    11/10/93  Glen George              initial revision
+                      =1    65     ;    11/14/94  Glen George              updated comments
+                      =1    66     ;    11/13/95  Glen George              changed ENABLE_BRG_ACC constant to be
+                      =1    67     ;                                          in binary
+                      =1    68     ;                                       corrected definition of BAUD9600 (had
+                      =1    69     ;                                          forgotten divide-by-two of 80188
+                      =1    70     ;                                          system clock)
+                      =1    71     ;    11/11/96  Glen George              updated comments
+                      =1    72     ;    11/17/97  Glen George              updated comments
+                      =1    73     ;    12/26/99  Glen George              updated comments
+                      =1    74     ;     2/06/03  Glen George              added constants for NO_ERROR and
+                      =1    75     ;                                          GETCHAR_ERROR
+                      =1    76     ;                                       updated comments
+                      =1    77     ;     3/03/03  Glen George              changed constants to match 16C450 on
+                      =1    78     ;                                          student boards instead of 82050 on
+                      =1    79     ;                                          old target boards (mainly baudrate)
+                      =1    80     
+                      =1    81     
+                      =1    82     
+                      =1    83     ; Serial (16C450) Defintions
+                      =1    84     
+                      =1    85     
+                      =1    86     ; Register I/O Addresses
+                      =1    87     
+  0180                =1    88     SERIAL_BRG_DIV  EQU     180H            ;baud rate generator divisor (R/W)
+  0180                =1    89     SERIAL_RX_REG   EQU     180H            ;receive data register (R)
+  0180                =1    90     SERIAL_TX_REG   EQU     180H            ;transmit data register (W)
+  0181                =1    91     SERIAL_IER      EQU     181H            ;interrupt enable register (R/W)
+  0183                =1    92     SERIAL_LCR      EQU     183H            ;line control register (R/W)
+  0184                =1    93     SERIAL_MCR      EQU     184H            ;modem control register (R/W)
+  0185                =1    94     SERIAL_LSR      EQU     185H            ;line status register (R/W)
+                      =1    95     
+                      =1    96     
+                      =1    97     ; Register Bit Values
+                      =1    98     
+                      =1    99     ; Line Control Register
+  0080                =1   100     ENABLE_BRG_ACC  EQU     10000000B       ;enable access to the baud rate divisor
+  0003                =1   101     SERIAL_SETUP    EQU     00000011B       ;0-------  access Rx/Tx data registers
+                      =1   102                                             ;-0------  no break output
+                      =1   103                                             ;--000---  no parity
+                      =1   104                                             ;-----0--  one stop bit
+                      =1   105                                             ;------11  8 data bits
+8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  21:38:18  01/16/;4  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                      =1   106     
+                      =1   107     ; Interrupt Enable Register
+  0000                =1   108     SERIAL_DIS_IRQ  EQU     00000000B       ;disable all interrupts
+                      =1   109     
+                      =1   110     ; Modem Control Register
+  0002                =1   111     SERIAL_RTS      EQU     00000010B       ;RTS output bit
+  0001                =1   112     SERIAL_DTR      EQU     00000001B       ;DTR output bit
+                      =1   113     
+                      =1   114     ; Baud Rate Generator
+  001E                =1   115     BAUD9600        EQU     30              ;divisor for 9600 baud
+                      =1   116                                             ;  18.432e6 / 4 / 9600 / 16 ==> 30
+                      =1   117     
+                      =1   118     ; Line Status Register
+  0001                =1   119     RX_DATA_RDY     EQU     00000001B       ;have data ready in receiver
+  0020                =1   120     TX_DATA_RDY     EQU     00100000B       ;ready to transmit data
+  001E                =1   121     ERROR_BIT_MASK  EQU     00011110B       ;error bits
+                      =1   122     
+                      =1   123     
+                      =1   124     ; General Constants
+  0000                =1   125     NO_ERROR        EQU     0               ;no errors in the serial system
+ -0001                =1   126     GETCHAR_ERROR   EQU     -1              ;SerialGetChar error return value
+                           127     
+                           128     
+                           129     
+                           130     
+                           131     ; setup code and data groups
+                           132     CGROUP  GROUP   CODE
+                           133     DGROUP  GROUP   DATA
+                           134     
+                           135     
+                           136     ; segment register assumptions
+                           137             ASSUME  CS:CGROUP, DS:DGROUP, ES:NOTHING, SS:DGROUP
+                           138     
+                           139     
+                           140     
+----                       141     CODE    SEGMENT PUBLIC 'CODE'
+                           142     
+                           143     
+                           144     
+                           145     
+                           146     ; InitSerialPort
+                           147     ;
+                           148     ; Description:      This procedure initializes the serial port.  It sets it to
+                           149     ;                   eight data bits, no parity, one stop bit, 9600 baud, and
+                           150     ;                   no interrupts.  DTR and RTS are both set active.
+                           151     ;
+                           152     ; Operation:        The initialization values are written to the serial chip
+                           153     ;                   and the error status is cleared.
+                           154     ;
+                           155     ; Arguments:        None.
+                           156     ; Return Value:     None.
+                           157     ;
+                           158     ; Local Variables:  None.
+                           159     ; Shared Variables: ErrorBits - set to NO_ERROR.
+                           160     ; Global Variables: None.
+8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  21:38:18  01/16/;4  PAGE    4
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           161     ;
+                           162     ; Input:            None.
+                           163     ; Output:           DTR and RTS are set to one.
+                           164     ;
+                           165     ; Error Handling:   None.
+                           166     ;
+                           167     ; Algorithms:       None.
+                           168     ; Data Structures:  None.
+                           169     ;
+                           170     ; Registers Used:   AX, DX
+                           171     ; Stack Depth:      0 words
+                           172     ;
+                           173     ; Author:           Glen George
+                           174     ; Last Modified:    Feb. 6, 2003
+                           175     
+0000                       176     InitSerialPort  PROC    NEAR
+                           177                     PUBLIC  InitSerialPort
+                           178     
+                           179     
+0000                       180     Init82050:                              ;initialize the 82050
+                           181     
+0000 BA8301                182             MOV     DX, SERIAL_LCR          ;talk to the baud rate divisor registers
+0003 B080                  183             MOV     AL, ENABLE_BRG_ACC
+0005 EE                    184             OUT     DX, AL
+                           185     
+0006 BA8001                186             MOV     DX, SERIAL_BRG_DIV      ;set the baud rate divisor
+0009 B81E00                187             MOV     AX, BAUD9600
+000C EE                    188             OUT     DX, AL                  ;write a byte at a time
+000D 42                    189             INC     DX
+000E 8AC4                  190             MOV     AL, AH
+0010 EE                    191             OUT     DX, AL
+                           192     
+0011 BA8301                193             MOV     DX, SERIAL_LCR          ;set all parameters in the line
+0014 B003                  194             MOV     AL, SERIAL_SETUP        ;    control register
+0016 EE                    195             OUT     DX, AL                  ;   (also changes access back to Rx/Tx)
+                           196     
+0017 BA8101                197             MOV     DX, SERIAL_IER          ;turn off interrupts
+001A B000                  198             MOV     AL, SERIAL_DIS_IRQ
+001C EE                    199             OUT     DX, AL
+                           200     
+001D BA8401                201             MOV     DX, SERIAL_MCR                  ;set the modem control lines
+0020 B003                  202             MOV     AL, SERIAL_RTS + SERIAL_DTR     ;RTS and DTR both on
+0022 EE                    203             OUT     DX, AL
+                           204     
+                           205             ;JMP    InitErrorStatus         ;now initialize the error status
+                           206     
+                           207     
+0023                       208     InitErrorStatus:                        ;reset the error status
+0023 C60600000090   R      209             MOV     ErrorBits, NO_ERROR
+                           210             ;JMP    EndInitSerialPort       ;all done initializing error status
+                           211     
+                           212     
+0029                       213     EndInitSerialPort:                      ;done initializing the serial port -
+0029 C3                    214             RET                             ;   return
+                           215     
+8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  21:38:18  01/16/;4  PAGE    5
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           216     
+                           217     InitSerialPort  ENDP
+                           218     
+                           219     
+                           220     
+                           221     
+                           222     ; SerialInRdy
+                           223     ;
+                           224     ; Description:      This function returns with AL non-zero if there is a
+                           225     ;                   character ready to be read from the serial port, and with
+                           226     ;                   AL equal to zero otherwise.
+                           227     ;
+                           228     ; Operation:        The Line Status Register is read, the error information
+                           229     ;                   is saved and whether or not a character is available is
+                           230     ;                   returned.  The return value is created by ANDing with the
+                           231     ;                   receive ready bit.
+                           232     ;
+                           233     ; Arguments:        None.
+                           234     ; Return Value:     AL - TRUE (non-zero) if there is a character available on
+                           235     ;                   the serial port, FALSE (zero) otherwise.
+                           236     ;
+                           237     ; Local Variables:  None.
+                           238     ; Shared Variables: ErrorBits - the newly read error bits are OR'ed into this
+                           239     ;                               value.
+                           240     ; Global Variables: None.
+                           241     ;
+                           242     ; Input:            None.
+                           243     ; Output:           None.
+                           244     ;
+                           245     ; Error Handling:   None.
+                           246     ;
+                           247     ; Algorithms:       None.
+                           248     ; Data Structures:  None.
+                           249     ;
+                           250     ; Registers Used:   flags, AL, DX
+                           251     ; Stack Depth:      0 words
+                           252     ;
+                           253     ; Author:           Glen George
+                           254     ; Last Modified:    Nov. 10, 1993
+                           255     
+002A                       256     SerialInRdy     PROC    NEAR
+                           257                     PUBLIC  SerialInRdy
+                           258     
+                           259     
+002A BA8501                260             MOV     DX, SERIAL_LSR          ;read the line status register
+002D EC                    261             IN      AL, DX
+002E 08060000       R      262             OR      ErrorBits, AL           ;keep error status updated
+0032 2401                  263             AND     AL, RX_DATA_RDY         ;set AL appropriately
+                           264     
+                           265     
+0034 C3                    266             RET                             ;all done - return
+                           267     
+                           268     
+                           269     SerialInRdy     ENDP
+                           270     
+8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  21:38:18  01/16/;4  PAGE    6
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           271     
+                           272     
+                           273     
+                           274     ; SerialOutRdy
+                           275     ;
+                           276     ; Description:      This function returns with AL non-zero if the serial
+                           277     ;                   channel is ready to transmit another character, otherwise
+                           278     ;                   AL is set to zero.
+                           279     ;
+                           280     ; Operation:        The Line Status Register is read, the error information
+                           281     ;                   is saved and whether or not the system is ready for
+                           282     ;                   another character to transmit is returned.  The return
+                           283     ;                   value is created by ANDing with the transmit ready bit.
+                           284     ;
+                           285     ; Arguments:        None.
+                           286     ; Return Value:     AL - TRUE (non-zero) if the serial port is ready to
+                           287     ;                   transmit a character, FALSE (zero) otherwise.
+                           288     ;
+                           289     ; Local Variables:  None.
+                           290     ; Shared Variables: ErrorBits - the newly read error bits are OR'ed into this
+                           291     ;                               value.
+                           292     ; Global Variables: None.
+                           293     ;
+                           294     ; Input:            None.
+                           295     ; Output:           None.
+                           296     ;
+                           297     ; Error Handling:   None.
+                           298     ;
+                           299     ; Algorithms:       None.
+                           300     ; Data Structures:  None.
+                           301     ;
+                           302     ; Registers Used:   flags, AL, DX
+                           303     ; Stack Depth:      0 words
+                           304     ;
+                           305     ; Author:           Glen George
+                           306     ; Last Modified:    Nov. 10, 1993
+                           307     
+0035                       308     SerialOutRdy    PROC    NEAR
+                           309                     PUBLIC  SerialOutRdy
+                           310     
+                           311     
+0035 BA8501                312             MOV     DX, SERIAL_LSR          ;read the line status register
+0038 EC                    313             IN      AL, DX
+0039 08060000       R      314             OR      ErrorBits, AL           ;keep error status updated
+003D 2420                  315             AND     AL, TX_DATA_RDY         ;set AL appropriately
+                           316     
+                           317     
+003F C3                    318             RET                             ;all done - return
+                           319     
+                           320     
+                           321     SerialOutRdy    ENDP
+                           322     
+                           323     
+                           324     
+                           325     
+8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  21:38:18  01/16/;4  PAGE    7
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           326     ; SerialGetChar
+                           327     ;
+                           328     ; Description:      This function gets a character from the serial port.  It
+                           329     ;                   does not return until it has the character.  If there is
+                           330     ;                   an error on the serial port, GETCHAR_ERROR is returned.
+                           331     ;
+                           332     ; Operation:        The function loops waiting for there to be a character
+                           333     ;                   on the serial input channel.  Once there is a character
+                           334     ;                   the character is read.  The error flags are also checked
+                           335     ;                   and if there are errors the return value is set to
+                           336     ;                   GETCHAR_ERROR.
+                           337     ;
+                           338     ; Arguments:        None.
+                           339     ; Return Value:     AX - character read from the serial channel, or
+                           340     ;                   GETCHAR_ERROR if there is an error.
+                           341     ;
+                           342     ; Local Variables:  None.
+                           343     ; Shared Variables: ErrorBits - read for error return.
+                           344     ; Global Variables: None.
+                           345     ;
+                           346     ; Input:            A character from the serial port.
+                           347     ; Output:           None.
+                           348     ;
+                           349     ; Error Handling:   If there is an error getting the character (as reported by
+                           350     ;                   the 82050), GETCHAR_ERROR is returned.
+                           351     ;
+                           352     ; Algorithms:       None.
+                           353     ; Data Structures:  None.
+                           354     ;
+                           355     ; Registers Used:   flags, AX, DX
+                           356     ; Stack Depth:      1 word
+                           357     ;
+                           358     ; Author:           Glen George
+                           359     ; Last Modified:    Feb. 6, 2003
+                           360     
+0040                       361     SerialGetChar   PROC    NEAR
+                           362                     PUBLIC  SerialGetChar
+                           363     
+                           364     
+0040                       365     StartSerialGetChar:                     ;get ready to read a character
+                           366     
+0040                       367     SerialGetCharWait:                      ;wait until have a character
+0040 E8E7FF                368             CALL    SerialInRdy             ;check if there is a character
+0043 0AC0                  369             OR      AL, AL                  ;set flags based on return value
+0045 74F9                  370             JZ      SerialGetCharWait       ;loop until there is a character
+                           371             ;JNZ    GetSerialChar           ;otherwise have a character
+                           372     
+                           373     
+0047                       374     GetSerialChar:                          ;get the character now
+0047 BA8001                375             MOV     DX, SERIAL_RX_REG       ;read it from the receive register
+004A EC                    376             IN      AL, DX
+004B B400                  377             MOV     AH, 0                   ;make sure AH is doesn't cause problems
+                           378             ;JMP    CheckErrorStatus        ;also check the error status
+                           379     
+004D                       380     CheckErrorStatus:                       ;see if there is a pending error
+8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  21:38:18  01/16/;4  PAGE    8
+
+
+LOC  OBJ                  LINE     SOURCE
+
+004D F60600001E90   R      381             TEST    ErrorBits, ERROR_BIT_MASK
+0053 7503                  382             JNZ     EndSerialGetChar        ;if no error, we're done
+                           383             ;JZ     HaveSerialError         ;otherwise have an error
+                           384     
+0055                       385     HaveSerialError:                        ;have an error on the serial channel
+0055 B8FFFF                386             MOV     AX, GETCHAR_ERROR       ;set the error return value
+                           387             ;JMP    EndSerialGetChar        ;and all done now
+                           388     
+                           389     
+0058                       390     EndSerialGetChar:                       ;done - just return
+0058 C3                    391             RET
+                           392     
+                           393     
+                           394     SerialGetChar   ENDP
+                           395     
+                           396     
+                           397     
+                           398     
+                           399     ; SerialPutChar
+                           400     ;
+                           401     ; Description:      This function outputs the passed character to the serial
+                           402     ;                   port.  It does not return until it has output the
+                           403     ;                   character (actually until it is written to the 82050).
+                           404     ;
+                           405     ; Operation:        The function loops waiting for the serial output channel
+                           406     ;                   to be ready to transmit a character.  Once it is ready the
+                           407     ;                   character is written.
+                           408     ;
+                           409     ; Arguments:        (SP + 2) - character to output to the serial channel.
+                           410     ; Return Value:     None.
+                           411     ;
+                           412     ; Local Variables:  None.
+                           413     ; Shared Variables: None.
+                           414     ; Global Variables: None.
+                           415     ;
+                           416     ; Input:            None.
+                           417     ; Output:           A character to the serial port.
+                           418     ;
+                           419     ; Error Handling:   None.
+                           420     ;
+                           421     ; Algorithms:       None.
+                           422     ; Data Structures:  None.
+                           423     ;
+                           424     ; Registers Used:   flags, AX, DX
+                           425     ; Stack Depth:      2 words
+                           426     ;
+                           427     ; Author:           Glen George
+                           428     ; Last Modified:    Nov. 19, 1997
+                           429     
+0059                       430     SerialPutChar   PROC    NEAR
+                           431                     PUBLIC  SerialPutChar
+                           432     
+                           433     
+  0004[]                   434     Argument        EQU     [BP + 4]        ;where the argument is
+                           435     
+8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  21:38:18  01/16/;4  PAGE    9
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           436     
+0059                       437     StartSerialPutChar:                     ;get ready to output a character
+                           438     
+0059 55                    439             PUSH    BP                      ;setup the stack frame
+005A 8BEC                  440             MOV     BP, SP
+                           441     
+005C                       442     SerialPutCharWait:                      ;wait until ready to transmit the character
+005C E8D6FF                443             CALL    SerialOutRdy            ;check if ready to output the character
+005F 0AC0                  444             OR      AL, AL                  ;set flags based on return value
+0061 74F9                  445             JZ      SerialPutCharWait       ;loop until ready to transmit
+                           446             ;JNZ    PutSerialChar           ;otherwise transmit the character
+                           447     
+                           448     
+0063                       449     PutSerialChar:                          ;send the character now
+0063 8A4604                450             MOV     AL, Argument            ;get character to output
+0066 BA8001                451             MOV     DX, SERIAL_TX_REG       ;write it to the transmit register
+0069 EE                    452             OUT     DX, AL
+                           453             ;JMP    EndSerialPutChar        ;now all done
+                           454     
+                           455     
+006A                       456     EndSerialPutChar:                       ;done - restore BP and return
+006A 5D                    457             POP     BP
+006B C3                    458             RET
+                           459     
+                           460     
+                           461     SerialPutChar   ENDP
+                           462     
+                           463     
+                           464     
+                           465     
+                           466     ; SerialErrStatus
+                           467     ;
+                           468     ; Description:      This function returns the error status of the serial port
+                           469     ;                   and resets that status to no errors (zero).
+                           470     ;
+                           471     ; Operation:        The error status is read, masked to be the error bits
+                           472     ;                   only, and then reset to no errors.  The read and masked
+                           473     ;                   value is returned.
+                           474     ;
+                           475     ; Arguments:        None.
+                           476     ; Return Value:     AX - error status, TRUE (non-zero) if there was an error
+                           477     ;                   on the serial channel, FALSE (zero) otherwise.
+                           478     ;
+                           479     ; Local Variables:  None.
+                           480     ; Shared Variables: ErrorBits - read to compute the return value and then
+                           481     ;                               reset to NO_ERROR.
+                           482     ; Global Variables: None.
+                           483     ;
+                           484     ; Input:            None.
+                           485     ; Output:           None.
+                           486     ;
+                           487     ; Error Handling:   None.
+                           488     ;
+                           489     ; Algorithms:       None.
+                           490     ; Data Structures:  None.
+8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  21:38:18  01/16/;4  PAGE   10
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           491     ;
+                           492     ; Registers Used:   flags, AX
+                           493     ; Stack Depth:      0 words
+                           494     ;
+                           495     ; Author:           Glen George
+                           496     ; Last Modified:    Feb. 6, 2003
+                           497     
+006C                       498     SerialErrStatus PROC    NEAR
+                           499                     PUBLIC  SerialErrStatus
+                           500     
+                           501     
+006C                       502     StartSerialErrStatus:                   ;get the error status
+                           503     
+006C A00000         R      504             MOV     AL, ErrorBits           ;get the status into AL
+006F 251E00                505             AND     AX, ERROR_BIT_MASK      ;mask error bits and extend into AX
+0072 C60600000090   R      506             MOV     ErrorBits, NO_ERROR     ;and clear the error status
+                           507             ;JMP    EndSerialErrStatus      ;now all done
+                           508     
+                           509     
+0078                       510     EndSerialErrStatus:                     ;done - just return with status in AX
+0078 C3                    511             RET
+                           512     
+                           513     
+                           514     SerialErrStatus ENDP
+                           515     
+                           516     
+                           517     
+                           518     
+----                       519     CODE    ENDS
+                           520     
+                           521     
+                           522     
+                           523     
+                           524     ;the data segment
+                           525     
+----                       526     DATA    SEGMENT PUBLIC  'DATA'
+                           527     
+                           528     
+0000 ??                    529     ErrorBits       DB      ?               ;error status from the 82050
+                           530     
+                           531     
+----                       532     DATA    ENDS
+                           533     
+                           534     
+                           535     
+                           536             END
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND

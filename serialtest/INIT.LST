@@ -1,0 +1,300 @@
+8086/87/88/186 MACRO ASSEMBLER    INIT                                                     21:37:03  01/16/;4  PAGE    1
+
+
+DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE INIT
+OBJECT MODULE PLACED IN INIT.OBJ
+ASSEMBLER INVOKED BY:  C:\UTIL\ASM86.EXE INIT.ASM
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                             1             NAME  INIT
+                             2     
+                             3     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             4     ;                                                                            ;
+                             5     ;                                     INIT                                   ;
+                             6     ;                           Initialization Functions                         ;
+                             7     ;                                                                            ;
+                             8     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                             9     
+                            10     ; This file contains the initialization functions for the example programs.
+                            11     ; The functions included are:
+                            12     ;    InitCS             - initialize the chip select logic
+                            13     ;    ClrIRQVectors      - clear the interrupt vector table
+                            14     ;    IllegalEventHander - illegal event handler for ClrIRQVectors
+                            15     ;
+                            16     ; Revision History:
+                            17     ;    11/19/97  Glen George      initial revision (from 10/29/97 version of
+                            18     ;                                  EHDEMO.ASM)
+                            19     ;    10/20/98  Glen George      updated comments
+                            20     ;    12/26/99  Glen George      changed segment names and switched to using
+                            21     ;                                   groups for the segment registers to be
+                            22     ;                                   compatible with C
+                            23     ;                               updated comments
+                            24     ;     1/26/00  Glen George      fixed typo in segment names
+                            25     ;     1/30/02  Glen George      added proper assumes for DS and ES
+                            26     ;                               switched to using ES to initialize vectors
+                            27     ;                               send a non-specific EOI in the illegal event
+                            28     ;                                  handler
+                            29     ;     2/06/03  Glen George      updated comments
+                            30     
+                            31     
+                            32     
+                            33     ; local include files
+                            34 +1  $INCLUDE(INIT.INC)
+                      =1    35     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    36     ;                                                                            ;
+                      =1    37     ;                                   INIT.INC                                 ;
+                      =1    38     ;                              Initialization Code                           ;
+                      =1    39     ;                                 Include File                               ;
+                      =1    40     ;                                                                            ;
+                      =1    41     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      =1    42     
+                      =1    43     ; This file contains the definitions for the initialization code (INIT.ASM).
+                      =1    44     ;
+                      =1    45     ; Revision History:
+                      =1    46     ;    11/17/97  Glen George      initial revision (from 10/28/97 version of
+                      =1    47     ;                                  EHDEMO.INC)
+                      =1    48     ;    12/26/99  Glen George      updated comments
+                      =1    49     ;     2/06/03  Glen George      changed value of MPCSval to a legal value
+                      =1    50     ;                               added some interrupt controller constants
+8086/87/88/186 MACRO ASSEMBLER    INIT                                                     21:37:03  01/16/;4  PAGE    2
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                      =1    51     ;                               changed RESERVED_VECS to be for the debugger,
+                      =1    52     ;                                  not the ICE
+                      =1    53     
+                      =1    54     
+                      =1    55     
+                      =1    56     ; Chip Select Unit Definitions
+                      =1    57     
+                      =1    58     ; Addresses
+  FFA4                =1    59     PACSreg         EQU     0FFA4H          ;address of PACS register
+  FFA8                =1    60     MPCSreg         EQU     0FFA8H          ;address of MPCS register
+                      =1    61     
+                      =1    62     ; Control Register Values
+  0003                =1    63     PACSval         EQU     00003H          ;PCS base at 0, 3 wait states
+  0183                =1    64     MPCSval         EQU     00183H          ;PCS in I/O space, use PCS5/6,
+                      =1    65                                             ;   3 wait states, MCSn is 8K
+                      =1    66     
+                      =1    67     
+                      =1    68     ; Interrupt Controller Definitions (needed by IllegalEventHandler)
+                      =1    69     
+                      =1    70     ; Addresses
+  FF22                =1    71     INTCtrlrEOI     EQU     0FF22H          ;address of interrupt controller EOI register
+                      =1    72     
+                      =1    73     ; Register Values
+  8000                =1    74     NonSpecEOI      EQU     08000H          ;Non-specific EOI command
+                      =1    75     
+                      =1    76     
+                      =1    77     ; General Definitions
+                      =1    78     
+  0004                =1    79     RESERVED_VECS   EQU     4               ;vectors reserved for debugger
+                            80     
+                            81     
+                            82     
+                            83     
+                            84     ; setup code group
+                            85     CGROUP  GROUP   CODE
+                            86     
+                            87     
+                            88     ; segment register assumptions
+                            89             ASSUME  CS:CGROUP, DS:NOTHING, ES:NOTHING
+                            90     
+                            91     
+                            92     
+----                        93     CODE    SEGMENT PUBLIC 'CODE'
+                            94     
+                            95     
+                            96     
+                            97     
+                            98     ; InitCS
+                            99     ;
+                           100     ; Description:      Initialize the Peripheral Chip Selects on the 80188.
+                           101     ;
+                           102     ; Operation:        Write initialization values to MPCS and PACS.
+                           103     ;
+                           104     ; Arguments:        None.
+                           105     ; Return Value:     None.
+8086/87/88/186 MACRO ASSEMBLER    INIT                                                     21:37:03  01/16/;4  PAGE    3
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           106     ;
+                           107     ; Local Variables:  None.
+                           108     ; Shared Variables: None.
+                           109     ; Global Variables: None.
+                           110     ;
+                           111     ; Input:            None.
+                           112     ; Output:           None.
+                           113     ;
+                           114     ; Error Handling:   None.
+                           115     ;
+                           116     ; Algorithms:       None.
+                           117     ; Data Structures:  None.
+                           118     ;
+                           119     ; Registers Used:   AX, DX
+                           120     ; Stack Depth:      0 words
+                           121     ;
+                           122     ; Author:           Glen George
+                           123     ; Last Modified:    Oct. 29, 1997
+                           124     
+0000                       125     InitCS  PROC    NEAR
+                           126             PUBLIC  InitCS
+                           127     
+                           128     
+0000 BAA4FF                129             MOV     DX, PACSreg     ;setup to write to PACS register
+0003 B80300                130             MOV     AX, PACSval
+0006 EE                    131             OUT     DX, AL          ;write PACSval to PACS (base at 0, 3 wait states)
+                           132     
+0007 BAA8FF                133             MOV     DX, MPCSreg     ;setup to write to MPCS register
+000A B88301                134             MOV     AX, MPCSval
+000D EE                    135             OUT     DX, AL          ;write MPCSval to MPCS (I/O space, 3 wait states)
+                           136     
+                           137     
+000E C3                    138             RET                     ;done so return
+                           139     
+                           140     
+                           141     InitCS  ENDP
+                           142     
+                           143     
+                           144     
+                           145     
+                           146     ; ClrIRQVectors
+                           147     ;
+                           148     ; Description:      This function installs the IllegalEventHandler for all
+                           149     ;                   interrupt vectors in the interrupt vector table.  Note
+                           150     ;                   that all 256 vectors are initialized so the code must be
+                           151     ;                   located above 400H.  The initialization skips the first
+                           152     ;                   RESERVED_VECS vectors.
+                           153     ;
+                           154     ; Operation:        The code loops, starting at vector RESERVED_VECS and
+                           155     ;                   ending at vector 256.  For each vector the address of
+                           156     ;                   IllegalEventHandler is written.
+                           157     ;
+                           158     ; Arguments:        None.
+                           159     ; Return Value:     None.
+                           160     ;
+8086/87/88/186 MACRO ASSEMBLER    INIT                                                     21:37:03  01/16/;4  PAGE    4
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           161     ; Local Variables:  CX - vector counter.
+                           162     ;                   SI - pointer to the vector table.
+                           163     ; Shared Variables: None.
+                           164     ; Global Variables: None.
+                           165     ;
+                           166     ; Input:            None.
+                           167     ; Output:           None.
+                           168     ;
+                           169     ; Error Handling:   None.
+                           170     ;
+                           171     ; Algorithms:       None.
+                           172     ; Data Structures:  None.
+                           173     ;
+                           174     ; Registers Used:   flags, AX, CX, SI, ES
+                           175     ; Stack Depth:      1 word
+                           176     ;
+                           177     ; Author:           Glen George
+                           178     ; Last Modified:    Jan. 30, 2002
+                           179     
+000F                       180     ClrIRQVectors   PROC    NEAR
+                           181                     PUBLIC  ClrIRQVectors
+                           182     
+                           183     
+000F                       184     InitClrVectorLoop:              ;setup to store the same handler 256 times
+                           185     
+000F 33C0                  186             XOR     AX, AX          ;clear DS (interrupt vectors are in segment 0)
+0011 8EC0                  187             MOV     ES, AX
+0013 BE1000                188             MOV     SI, 4 * RESERVED_VECS   ;initialize SI to skip RESERVED_VECS (4 bytes
+                                    each)
+                           189     
+0016 B9FC00                190             MOV     CX, 256 - RESERVED_VECS ;up to 256 vectors to initialize
+                           191     
+                           192     
+0019                       193     ClrVectorLoop:                  ;loop clearing each vector
+                           194                                     ;store the vector
+0019 26C7042A00     R      195             MOV     ES: WORD PTR [SI], OFFSET(IllegalEventHandler)
+001E 26C74402----   R      196             MOV     ES: WORD PTR [SI + 2], SEG(IllegalEventHandler)
+                           197     
+0024 83C604                198             ADD     SI, 4           ;update pointer to next vector
+                           199     
+0027 E2F0                  200             LOOP    ClrVectorLoop   ;loop until have cleared all vectors
+                           201             ;JMP    EndClrIRQVectors;and all done
+                           202     
+                           203     
+0029                       204     EndClrIRQVectors:               ;all done, return
+0029 C3                    205             RET
+                           206     
+                           207     
+                           208     ClrIRQVectors   ENDP
+                           209     
+                           210     
+                           211     
+                           212     
+                           213     ; IllegalEventHandler
+                           214     ;
+8086/87/88/186 MACRO ASSEMBLER    INIT                                                     21:37:03  01/16/;4  PAGE    5
+
+
+LOC  OBJ                  LINE     SOURCE
+
+                           215     ; Description:      This procedure is the event handler for illegal
+                           216     ;                   (uninitialized) interrupts.
+                           217     ;
+                           218     ; Operation:        The function does nothing - it just sends a non-specific
+                           219     ;                   EOI (doesn't know which interrupt occurred) and returns.
+                           220     ;
+                           221     ; Arguments:        None.
+                           222     ; Return Value:     None.
+                           223     ;
+                           224     ; Local Variables:  None.
+                           225     ; Shared Variables: None.
+                           226     ; Global Variables: None.
+                           227     ;
+                           228     ; Input:            None.
+                           229     ; Output:           None.
+                           230     ;
+                           231     ; Error Handling:   None.
+                           232     ;
+                           233     ; Algorithms:       None.
+                           234     ; Data Structures:  None.
+                           235     ;
+                           236     ; Registers Used:   None
+                           237     ; Stack Depth:      0 words
+                           238     ;
+                           239     ; Author:           Glen George
+                           240     ; Last Modified:    Jan. 30, 2002
+                           241     
+002A                       242     IllegalEventHandler     PROC    NEAR
+                           243     
+002A 90                    244             NOP                             ;do nothing (can set breakpoint here)
+                           245     
+002B 50                    246             PUSH    AX                      ;save the registers
+002C 52                    247             PUSH    DX
+                           248     
+002D BA22FF                249             MOV     DX, INTCtrlrEOI         ;send a non-sepecific EOI to the
+0030 B80080                250             MOV     AX, NonSpecEOI          ;   interrupt controller to clear out
+0033 EE                    251             OUT     DX, AL                  ;   the interrupt that got us here
+                           252     
+0034 5A                    253             POP     DX                      ;restore the registers
+0035 58                    254             POP     AX
+                           255     
+0036 CF                    256             IRET                            ;and return
+                           257     
+                           258     
+                           259     IllegalEventHandler     ENDP
+                           260     
+                           261     
+                           262     
+----                       263     CODE    ENDS
+                           264     
+                           265     
+                           266     
+                           267             END
+
+ASSEMBLY COMPLETE, NO ERRORS FOUND
