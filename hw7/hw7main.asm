@@ -1,9 +1,9 @@
-    NAME    HW6MAIN
+    NAME    HW7MAIN
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;                                                                            ;
-;                                   HW6MAIN                                  ;
-;                               Homework 6 Main                              ;
+;                                   HW7MAIN                                  ;
+;                               Homework 7 Main                              ;
 ;                                  EE/CS 51                                  ;
 ;                                 Archan Luhar                               ;
 ;                                 TA: Joe Greef                              ;
@@ -11,16 +11,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; Description:      This program initializes the proper hardware and memory
-;                   for the purpose of testing out reading the target board's
-;                   parallel output to the three motors and the on laser.
+;                   for the purpose of testing the serial interface on the
+;                   target board.
 ;
-;                   This main file calls a test function in order to initialize
-;                   the testing environment. Calls are made by the switch
-;                   routines to another test function EnqueueEvent which
-;                   uses the display routines to display information about
-;                   the key presses. Make sure debouncing and keypress-repeat
-;                   work!
-;
+;                   This main file calls the serial initialization function
+;                   that sets up the serial port hardware and interrupt
+;                   vector.
+;                   
+;                   It also calls a test function which sends over serial
+;                   a series of messages. Then, this test function
 ; Input:            Switches.
 ; Output:           Parallel.
 ;
@@ -50,11 +49,8 @@ CODE    SEGMENT PUBLIC 'CODE'
 
 ; External references
     EXTRN   InitCS:NEAR
-    EXTRN   InitTimer0:NEAR
-    EXTRN   SetTimerInterrupts:NEAR
-    EXTRN   InstallTimer0EventHandler:NEAR
-    EXTRN   InitParallel:NEAR
-    EXTRN   MotorTest:NEAR
+    EXTRN   InitSerialPort:NEAR
+    EXTRN   SerialIOTest :NEAR
 
 
 START:  
@@ -67,11 +63,7 @@ MAIN:
     MOV     DS, AX
 
     CALL    InitCS
-    CALL    InitParallel            ; Initializes the parallel port
-
-    CALL    InstallTimer0EventHandler ; Initialize timers and interrupts
-    CALL    InitTimer0
-    CALL    SetTimerInterrupts
+    CALL    InitSerialPort            ; Initializes the serial port
     
     STI                             ; Enable interrupts so event handlers can
                                     ; function.
