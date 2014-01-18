@@ -302,8 +302,8 @@ GetSerialChar:                          ;get the character now
 
 CheckErrorStatus:                       ;see if there is a pending error
         TEST    ErrorBits, ERROR_BIT_MASK
-        JNZ     EndSerialGetChar        ;if no error, we're done
-        ;JZ     HaveSerialError         ;otherwise have an error
+        JZ      EndSerialGetChar        ;if no error, we're done
+        ;JNZ    HaveSerialError         ;otherwise have an error
 
 HaveSerialError:                        ;have an error on the serial channel
         MOV     AX, GETCHAR_ERROR       ;set the error return value

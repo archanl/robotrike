@@ -1,4 +1,4 @@
-8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  21:38:18  01/16/;4  PAGE    1
+8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  17:00:17  01/17/;4  PAGE    1
 
 
 DOS 5.0 (038-N) 8086/87/88/186 MACRO ASSEMBLER V3.1 ASSEMBLY OF MODULE POLLSER
@@ -58,7 +58,7 @@ LOC  OBJ                  LINE     SOURCE
                             48     ; local include files
                             49 +1  $INCLUDE(SERIAL.INC)
                       =1    50     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  21:38:18  01/16/;4  PAGE    2
+8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  17:00:17  01/17/;4  PAGE    2
 
 
 LOC  OBJ                  LINE     SOURCE
@@ -100,13 +100,13 @@ LOC  OBJ                  LINE     SOURCE
                       =1    85     
                       =1    86     ; Register I/O Addresses
                       =1    87     
-  0180                =1    88     SERIAL_BRG_DIV  EQU     180H            ;baud rate generator divisor (R/W)
-  0180                =1    89     SERIAL_RX_REG   EQU     180H            ;receive data register (R)
-  0180                =1    90     SERIAL_TX_REG   EQU     180H            ;transmit data register (W)
-  0181                =1    91     SERIAL_IER      EQU     181H            ;interrupt enable register (R/W)
-  0183                =1    92     SERIAL_LCR      EQU     183H            ;line control register (R/W)
-  0184                =1    93     SERIAL_MCR      EQU     184H            ;modem control register (R/W)
-  0185                =1    94     SERIAL_LSR      EQU     185H            ;line status register (R/W)
+  0100                =1    88     SERIAL_BRG_DIV  EQU     100H            ;baud rate generator divisor (R/W)
+  0100                =1    89     SERIAL_RX_REG   EQU     100H            ;receive data register (R)
+  0100                =1    90     SERIAL_TX_REG   EQU     100H            ;transmit data register (W)
+  0101                =1    91     SERIAL_IER      EQU     101H            ;interrupt enable register (R/W)
+  0103                =1    92     SERIAL_LCR      EQU     103H            ;line control register (R/W)
+  0104                =1    93     SERIAL_MCR      EQU     104H            ;modem control register (R/W)
+  0105                =1    94     SERIAL_LSR      EQU     105H            ;line status register (R/W)
                       =1    95     
                       =1    96     
                       =1    97     ; Register Bit Values
@@ -118,7 +118,7 @@ LOC  OBJ                  LINE     SOURCE
                       =1   103                                             ;--000---  no parity
                       =1   104                                             ;-----0--  one stop bit
                       =1   105                                             ;------11  8 data bits
-8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  21:38:18  01/16/;4  PAGE    3
+8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  17:00:17  01/17/;4  PAGE    3
 
 
 LOC  OBJ                  LINE     SOURCE
@@ -132,7 +132,7 @@ LOC  OBJ                  LINE     SOURCE
   0001                =1   112     SERIAL_DTR      EQU     00000001B       ;DTR output bit
                       =1   113     
                       =1   114     ; Baud Rate Generator
-  001E                =1   115     BAUD9600        EQU     30              ;divisor for 9600 baud
+  003C                =1   115     BAUD9600        EQU     60              ;divisor for 9600 baud
                       =1   116                                             ;  18.432e6 / 4 / 9600 / 16 ==> 30
                       =1   117     
                       =1   118     ; Line Status Register
@@ -178,7 +178,7 @@ LOC  OBJ                  LINE     SOURCE
                            158     ; Local Variables:  None.
                            159     ; Shared Variables: ErrorBits - set to NO_ERROR.
                            160     ; Global Variables: None.
-8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  21:38:18  01/16/;4  PAGE    4
+8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  17:00:17  01/17/;4  PAGE    4
 
 
 LOC  OBJ                  LINE     SOURCE
@@ -204,26 +204,26 @@ LOC  OBJ                  LINE     SOURCE
                            179     
 0000                       180     Init82050:                              ;initialize the 82050
                            181     
-0000 BA8301                182             MOV     DX, SERIAL_LCR          ;talk to the baud rate divisor registers
+0000 BA0301                182             MOV     DX, SERIAL_LCR          ;talk to the baud rate divisor registers
 0003 B080                  183             MOV     AL, ENABLE_BRG_ACC
 0005 EE                    184             OUT     DX, AL
                            185     
-0006 BA8001                186             MOV     DX, SERIAL_BRG_DIV      ;set the baud rate divisor
-0009 B81E00                187             MOV     AX, BAUD9600
+0006 BA0001                186             MOV     DX, SERIAL_BRG_DIV      ;set the baud rate divisor
+0009 B83C00                187             MOV     AX, BAUD9600
 000C EE                    188             OUT     DX, AL                  ;write a byte at a time
 000D 42                    189             INC     DX
 000E 8AC4                  190             MOV     AL, AH
 0010 EE                    191             OUT     DX, AL
                            192     
-0011 BA8301                193             MOV     DX, SERIAL_LCR          ;set all parameters in the line
+0011 BA0301                193             MOV     DX, SERIAL_LCR          ;set all parameters in the line
 0014 B003                  194             MOV     AL, SERIAL_SETUP        ;    control register
 0016 EE                    195             OUT     DX, AL                  ;   (also changes access back to Rx/Tx)
                            196     
-0017 BA8101                197             MOV     DX, SERIAL_IER          ;turn off interrupts
+0017 BA0101                197             MOV     DX, SERIAL_IER          ;turn off interrupts
 001A B000                  198             MOV     AL, SERIAL_DIS_IRQ
 001C EE                    199             OUT     DX, AL
                            200     
-001D BA8401                201             MOV     DX, SERIAL_MCR                  ;set the modem control lines
+001D BA0401                201             MOV     DX, SERIAL_MCR                  ;set the modem control lines
 0020 B003                  202             MOV     AL, SERIAL_RTS + SERIAL_DTR     ;RTS and DTR both on
 0022 EE                    203             OUT     DX, AL
                            204     
@@ -238,7 +238,7 @@ LOC  OBJ                  LINE     SOURCE
 0029                       213     EndInitSerialPort:                      ;done initializing the serial port -
 0029 C3                    214             RET                             ;   return
                            215     
-8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  21:38:18  01/16/;4  PAGE    5
+8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  17:00:17  01/17/;4  PAGE    5
 
 
 LOC  OBJ                  LINE     SOURCE
@@ -287,7 +287,7 @@ LOC  OBJ                  LINE     SOURCE
                            257                     PUBLIC  SerialInRdy
                            258     
                            259     
-002A BA8501                260             MOV     DX, SERIAL_LSR          ;read the line status register
+002A BA0501                260             MOV     DX, SERIAL_LSR          ;read the line status register
 002D EC                    261             IN      AL, DX
 002E 08060000       R      262             OR      ErrorBits, AL           ;keep error status updated
 0032 2401                  263             AND     AL, RX_DATA_RDY         ;set AL appropriately
@@ -298,7 +298,7 @@ LOC  OBJ                  LINE     SOURCE
                            268     
                            269     SerialInRdy     ENDP
                            270     
-8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  21:38:18  01/16/;4  PAGE    6
+8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  17:00:17  01/17/;4  PAGE    6
 
 
 LOC  OBJ                  LINE     SOURCE
@@ -344,7 +344,7 @@ LOC  OBJ                  LINE     SOURCE
                            309                     PUBLIC  SerialOutRdy
                            310     
                            311     
-0035 BA8501                312             MOV     DX, SERIAL_LSR          ;read the line status register
+0035 BA0501                312             MOV     DX, SERIAL_LSR          ;read the line status register
 0038 EC                    313             IN      AL, DX
 0039 08060000       R      314             OR      ErrorBits, AL           ;keep error status updated
 003D 2420                  315             AND     AL, TX_DATA_RDY         ;set AL appropriately
@@ -358,7 +358,7 @@ LOC  OBJ                  LINE     SOURCE
                            323     
                            324     
                            325     
-8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  21:38:18  01/16/;4  PAGE    7
+8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  17:00:17  01/17/;4  PAGE    7
 
 
 LOC  OBJ                  LINE     SOURCE
@@ -412,20 +412,20 @@ LOC  OBJ                  LINE     SOURCE
                            372     
                            373     
 0047                       374     GetSerialChar:                          ;get the character now
-0047 BA8001                375             MOV     DX, SERIAL_RX_REG       ;read it from the receive register
+0047 BA0001                375             MOV     DX, SERIAL_RX_REG       ;read it from the receive register
 004A EC                    376             IN      AL, DX
 004B B400                  377             MOV     AH, 0                   ;make sure AH is doesn't cause problems
                            378             ;JMP    CheckErrorStatus        ;also check the error status
                            379     
 004D                       380     CheckErrorStatus:                       ;see if there is a pending error
-8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  21:38:18  01/16/;4  PAGE    8
+8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  17:00:17  01/17/;4  PAGE    8
 
 
 LOC  OBJ                  LINE     SOURCE
 
 004D F60600001E90   R      381             TEST    ErrorBits, ERROR_BIT_MASK
-0053 7503                  382             JNZ     EndSerialGetChar        ;if no error, we're done
-                           383             ;JZ     HaveSerialError         ;otherwise have an error
+0053 7403                  382             JZ      EndSerialGetChar        ;if no error, we're done
+                           383             ;JNZ    HaveSerialError         ;otherwise have an error
                            384     
 0055                       385     HaveSerialError:                        ;have an error on the serial channel
 0055 B8FFFF                386             MOV     AX, GETCHAR_ERROR       ;set the error return value
@@ -478,7 +478,7 @@ LOC  OBJ                  LINE     SOURCE
                            433     
   0004[]                   434     Argument        EQU     [BP + 4]        ;where the argument is
                            435     
-8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  21:38:18  01/16/;4  PAGE    9
+8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  17:00:17  01/17/;4  PAGE    9
 
 
 LOC  OBJ                  LINE     SOURCE
@@ -498,7 +498,7 @@ LOC  OBJ                  LINE     SOURCE
                            448     
 0063                       449     PutSerialChar:                          ;send the character now
 0063 8A4604                450             MOV     AL, Argument            ;get character to output
-0066 BA8001                451             MOV     DX, SERIAL_TX_REG       ;write it to the transmit register
+0066 BA0001                451             MOV     DX, SERIAL_TX_REG       ;write it to the transmit register
 0069 EE                    452             OUT     DX, AL
                            453             ;JMP    EndSerialPutChar        ;now all done
                            454     
@@ -538,7 +538,7 @@ LOC  OBJ                  LINE     SOURCE
                            488     ;
                            489     ; Algorithms:       None.
                            490     ; Data Structures:  None.
-8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  21:38:18  01/16/;4  PAGE   10
+8086/87/88/186 MACRO ASSEMBLER    POLLSER                                                  17:00:17  01/17/;4  PAGE   10
 
 
 LOC  OBJ                  LINE     SOURCE

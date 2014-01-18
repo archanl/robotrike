@@ -36,13 +36,13 @@
 
 ; Register I/O Addresses
 
-SERIAL_BRG_DIV  EQU     180H            ;baud rate generator divisor (R/W)
-SERIAL_RX_REG   EQU     180H            ;receive data register (R)
-SERIAL_TX_REG   EQU     180H            ;transmit data register (W)
-SERIAL_IER      EQU     181H            ;interrupt enable register (R/W)
-SERIAL_LCR      EQU     183H            ;line control register (R/W)
-SERIAL_MCR      EQU     184H            ;modem control register (R/W)
-SERIAL_LSR      EQU     185H            ;line status register (R/W)
+SERIAL_BRG_DIV  EQU     100H            ;baud rate generator divisor (R/W)
+SERIAL_RX_REG   EQU     100H            ;receive data register (R)
+SERIAL_TX_REG   EQU     100H            ;transmit data register (W)
+SERIAL_IER      EQU     101H            ;interrupt enable register (R/W)
+SERIAL_LCR      EQU     103H            ;line control register (R/W)
+SERIAL_MCR      EQU     104H            ;modem control register (R/W)
+SERIAL_LSR      EQU     105H            ;line status register (R/W)
 
 
 ; Register Bit Values
@@ -63,7 +63,7 @@ SERIAL_RTS      EQU     00000010B       ;RTS output bit
 SERIAL_DTR      EQU     00000001B       ;DTR output bit
 
 ; Baud Rate Generator
-BAUD9600        EQU     30              ;divisor for 9600 baud
+BAUD9600        EQU     60              ;divisor for 9600 baud
                                         ;  18.432e6 / 4 / 9600 / 16 ==> 30
 
 ; Line Status Register
