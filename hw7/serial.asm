@@ -11,6 +11,106 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
+    EXTRN   QueueInit:NEAR
+    EXTRN   QueueEmpty:NEAR
+    EXTRN   QueueFull:NEAR
+    EXTRN   Dequeue:NEAR
+    EXTRN   Enqueue:NEAR
+    
+
+$INCLUDE(queue.inc)
+
+
+; InitSerialPort
+;
+; Description:      This procedure initializes the serial port.  It sets it to
+;                   eight data bits, no parity, one stop bit, 9600 baud, and
+;                   no interrupts.  DTR and RTS are both set active.
+;
+; Operation:        The initialization values are written to the serial chip
+;                   and the error status is cleared.
+;
+; Arguments:        None.
+; Return Value:     None.
+;
+; Local Variables:  None.
+; Shared Variables: ErrorBits - set to NO_ERROR.
+; Global Variables: None.
+;
+; Input:            None.
+; Output:           DTR and RTS are set to one.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+; Data Structures:  None.
+;
+; Registers Used:   AX, DX
+; Stack Depth:      0 words
+;
+; Author:           Glen George
+; Last Modified:    Feb. 6, 2003
+
+InitSerialPort  PROC    NEAR
+                PUBLIC  InitSerialPort
+
+
+Init82050:                              ;initialize the 82050
+
+        MOV     SI, OFFSET(receiveQueue); Let SI be the pointer to the queue
+        MOV     AX, SERIAL_QUEUE_LENGTH ; Set size to that defined in inc
+        MOV     BL, ELEM_BYTE_SIZE      ; Set element size to byte
+        CALL    QueueInit               ; Initialize the queue
+        
+        MOV     SI, OFFSET(sendQueue)   ; Let SI be the pointer to the queue
+        MOV     AX, SERIAL_QUEUE_LENGTH ; Set size to that defined in inc
+        MOV     BL, ELEM_BYTE_SIZE      ; Set element size to byte
+        CALL    QueueInit               ; Initialize the queue
+        
+        
+        
+        MOV     DX, SERIAL_LCR          ;talk to the baud rate divisor registers
+        MOV     AL, ENABLE_BRG_ACC
+        OUT     DX, AL
+
+        MOV     DX, SERIAL_BRG_DIV      ;set the baud rate divisor
+        MOV     AX, BAUD9600
+        OUT     DX, AL                  ;write a byte at a time
+        INC     DX
+        MOV     AL, AH
+        OUT     DX, AL
+
+        MOV     DX, SERIAL_LCR          ;set all parameters in the line
+        MOV     AL, SERIAL_SETUP        ;    control register
+        OUT     DX, AL                  ;   (also changes access back to Rx/Tx)
+
+        ; Install serial interrupt handler into the vector table
+        InstallVector(INT_VEC_SERIAL, SerialInterruptHandler)
+        
+        MOV     DX, SERIAL_IER          ;enable interrupts
+        MOV     AL, SERIAL_EN_IRQ
+        OUT     DX, AL
+
+        MOV     DX, SERIAL_MCR                  ;set the modem control lines
+        MOV     AL, SERIAL_RTS + SERIAL_DTR     ;RTS and DTR both on
+        OUT     DX, AL
+
+        ;JMP    InitErrorStatus         ;now initialize the error status
+
+
+InitErrorStatus:                        ;reset the error status
+        MOV     ErrorBits, NO_ERROR
+        ;JMP    EndInitSerialPort       ;all done initializing error status
+
+
+EndInitSerialPort:                      ;done initializing the serial port -
+        RET                             ;   return
+
+
+InitSerialPort  ENDP
+
+
+
 ; SerialPutChar
 ;
 ; Description:      This function adds a character to a queue to be sent
@@ -145,3 +245,11 @@
 ; set parity and serial_parity from defined constant 
 ; set data size and serial_data_size from defined constant 
 ;
+
+
+
+
+DATA SEGMENT PUBLIC 'DATA'
+    sendQueue       queueSTRUC  <>
+    receiveQueue    queueSTRUC  <>
+DATA ENDS
