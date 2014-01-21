@@ -1,8 +1,8 @@
-    NAME    HW7MAIN
+    NAME    HW8MAIN
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;                                                                            ;
-;                                   HW7MAIN                                  ;
+;                                   HW8MAIN                                  ;
 ;                               Homework 7 Main                              ;
 ;                                  EE/CS 51                                  ;
 ;                                 Archan Luhar                               ;
@@ -10,18 +10,12 @@
 ;                                                                            ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; Description:      This program initializes the proper hardware and memory
-;                   for the purpose of testing the serial interface on the
-;                   target board.
+; Description:      This program initializes the segment registers and stack.
+;                   Then it calls the test function which tests the serial
+;                   character parser.
 ;
-;                   This main file calls the serial initialization function
-;                   that sets up the serial port hardware and interrupt
-;                   vector.
-;                   
-;                   It also calls a test function which sends over serial
-;                   a series of messages. Then, this test function
-; Input:            Switches.
-; Output:           Parallel.
+; Input:            None.
+; Output:           None.
 ;
 ; User Interface:   None.
 ;
@@ -31,12 +25,11 @@
 ; Data Structures:  None.
 ;
 ; Known Bugs:       None.
-; Limitations:      The fact that there are three motors is hard coded.
+; Limitations:      None.
 ;
 ; Revision History:
-;    11/19/13  Archan Luhar     Created hw5main.asm. Contains main function
-;                               that calls chip initialization functions, and
-;                               test function..
+;    11/20/13  Archan Luhar     Created hw8main.asm. Contains main function
+;                               that calls the test function.
 
 
 CGROUP  GROUP   CODE
@@ -49,8 +42,7 @@ CODE    SEGMENT PUBLIC 'CODE'
 
 ; External references
     EXTRN   InitCS:NEAR
-    EXTRN   InitSerialPort:NEAR
-    EXTRN   SerialIOTest:NEAR
+    EXTRN   ParseTest:NEAR
 
 
 START:  
@@ -63,12 +55,10 @@ MAIN:
     MOV     DS, AX
 
     CALL    InitCS
-    CALL    InitSerialPort            ; Initializes the serial port
     
-    STI                             ; Enable interrupts so event handlers can
-                                    ; function.
+    STI
     
-    CALL    SerialIOTest
+    CALL    ParseTest
 
 EndMain:
     HLT
