@@ -33,12 +33,24 @@
 ;                                       for serial chip
 
 ; Interrupt definitions
+INTCtrlrEOI     EQU     0FF22H          ; Interrupt controller EOI register
 INT_2_VEC       EQU     14
 INT_VEC_SERIAL  EQU     INT_2_VEC
+INT_2_EOI       EQU     000EH
+SerialEOI       EQU     INT_2_EOI
+
+SERIAL_ICR      EQU     0FF3CH          ; int 2 (serial) int contrl register
+SERIAL_ICR_VAL  EQU     00001H          ;0000 0000 000- ----  reserved
+                                        ;---- ---- ---0 ----  edge triggering
+                                        ;---- ---- ---- 0---  enable interrupt
+                                        ;---- ---- ---- -111  int 2 priority
 
 
 SERIAL_QUEUE_LENGTH EQU 128
 
+; Events
+SERIAL_ERROR_EVENT   EQU 1
+SERIAL_RECEIVE_EVENT EQU 2
 
 
 ; Serial (16C450) Defintions
@@ -72,6 +84,11 @@ SERIAL_EN_IRQ   EQU     00000111B       ;0000---- Unused
                                         ;-----1-- Enable receiver line status
                                         ;------1- Enable THRE interrupt
                                         ;-------1 Enable received data available interrupt
+SERIAL_EN_IRQ_NOTX  EQU 00000101B       ;0000---- Unused
+                                        ;----0--- Disable modem status
+                                        ;-----1-- Enable receiver line status
+                                        ;------0- Disable THRE interrupt
+                                        ;-------1 Enable received data available interrupt
 SERIAL_DIS_IRQ  EQU     00000000B       ;disable all interrupts
 
 
@@ -87,6 +104,11 @@ BAUD9600        EQU     60              ;divisor for 9600 baud
 RX_DATA_RDY     EQU     00000001B       ;have data ready in receiver
 TX_DATA_RDY     EQU     00100000B       ;ready to transmit data
 ERROR_BIT_MASK  EQU     00011110B       ;error bits
+
+; Interrupt Identification Register
+SERIAL_IIR_ERR  EQU     00000110B
+SERIAL_IIR_RXA  EQU     00000100B
+SERIAL_IIR_TXA  EQU     00000010B
 
 
 ; General Constants

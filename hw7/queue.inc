@@ -19,9 +19,11 @@ QUEUE_QUEUE_OFFSET          EQU     7
 ; The queue struct must me initialized with less bytes than this max number.
 ; E.g. 256 word sized elements = 512 bytes: good
 ; E.g. 512 byte sized elements = 512 bytes: good
-; E.g. 512 word sized elements = 1024 bytes: good
-; E.g. 1024 word sized elements = 2048 bytes: not good
-QUEUE_MAX_BYTES             EQU     1024
+QUEUE_MAX_BYTES             EQU     256
+
+; Defines the two types of elements in the queue
+QUEUE_BYTE_ELEM             EQU 0
+QUEUE_WORD_ELEM             EQU 1
 
 ; Defines the number of bytes in the two possible element sizes byte and word
 ELEM_BYTE_SIZE              EQU     1

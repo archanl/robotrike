@@ -34,6 +34,7 @@
 
 ; Include file defines queue struct and offset constants
 $INCLUDE(queue.inc)
+$INCLUDE(simpmac.inc)
 
 
 CGROUP  GROUP   CODE
@@ -79,22 +80,12 @@ CODE SEGMENT PUBLIC 'CODE'
 ;
 ; Author:           Archan Luhar
 ; Last Modified:    11/02/2013
-;
-;
-; Pseudo Code
-; -----------
-;   queue.elem_size = size ? 2 : 1  ; queue's size: word if nonzero, byte if 0
-;   queue.len = len                 ; set queue's length
-;   queue.head_index = 0            ; set queue's head index
-;   queue.count = 0                 ; set queue's count of number of elements
-;
-;   queueSize = len * queue.elem_size
 
 QueueInit   PROC    NEAR
             PUBLIC  QueueInit
 
 InitQueueInit:
-    CMP BL, 0                   ; Check the argument size
+    CMP BL, QUEUE_BYTE_ELEM     ; Check the argument element size
     JE SetQueueSizeByte         ; If zero, then set to byte size element
 
 SetQueueSizeWord:
@@ -103,14 +94,14 @@ SetQueueSizeWord:
 
 SetQueueSizeByte:
     MOV  [SI].elem_size, ELEM_BYTE_SIZE
-    ; JMP SetQueueLength;
+    ; JMP SetQueueLength
 
 SetQueueLength:
     MOV [SI].len, AX            ; Set the number of elements from AX argument
 
 SetQueueHeadAndCount:
-    MOV [SI].head_index, 0      ; Initialize head index to 0
-    MOV [SI].count, 0           ; Initialize as empty queue having count 0 elems
+    MOV [SI].head_index, 0      ; Initialize empty queue
+    MOV [SI].count, 0           ; Initialize head index and element count to 0
 
 EndQueueInit:
     RET
@@ -151,11 +142,6 @@ QueueInit   ENDP
 ;
 ; Author:           Archan Luhar
 ; Last Modified:    10/28/2013
-;
-;
-; Pseudo Code
-; -----------
-;   return count == 0
 
 QueueEmpty  PROC    NEAR
             PUBLIC  QueueEmpty
@@ -200,11 +186,6 @@ QueueEmpty  ENDP
 ;
 ; Author:           Archan Luhar
 ; Last Modified:    11/02/2013
-;
-;
-; Pseudo Code
-; -----------
-;   return queue.count == queue.length
 
 QueueFull   PROC    NEAR
             PUBLIC  QueueFull
@@ -437,6 +418,7 @@ SetQueueByte:
 EndEnqueue:
     POP SI                      ; Restore original queue ptr
     INC [SI].count              ; Increment count of number of elems in queue
+
     RET
 
 Enqueue     ENDP

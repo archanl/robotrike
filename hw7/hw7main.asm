@@ -50,7 +50,7 @@ CODE    SEGMENT PUBLIC 'CODE'
 ; External references
     EXTRN   InitCS:NEAR
     EXTRN   InitSerialPort:NEAR
-    EXTRN   SerialIOTest :NEAR
+    EXTRN   SerialIOTest:NEAR
 
 
 START:  
@@ -68,7 +68,7 @@ MAIN:
     STI                             ; Enable interrupts so event handlers can
                                     ; function.
     
-    CALL    MotorTest
+    CALL    SerialIOTest
 
 EndMain:
     HLT
