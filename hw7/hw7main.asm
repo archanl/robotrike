@@ -2,11 +2,11 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;                                                                            ;
-;                                   HW7MAIN                                  ;
+;                                  HW7MAIN                                   ;
 ;                               Homework 7 Main                              ;
 ;                                  EE/CS 51                                  ;
-;                                 Archan Luhar                               ;
-;                                 TA: Joe Greef                              ;
+;                                Archan Luhar                                ;
+;                               TA:  Joe Greef                               ;
 ;                                                                            ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -19,11 +19,17 @@
 ;                   vector.
 ;                   
 ;                   It also calls a test function which sends over serial
-;                   a series of messages. Then, this test function
-; Input:            Switches.
-; Output:           Parallel.
+;                   a series of messages. Then, the test function outputs
+;                   a series of 100 lines. The test then waits for an input
+;                   ending with a return key at which point it prints that
+;                   line 100 times.
 ;
-; User Interface:   None.
+; Input:            Serial.
+; Output:           Serial.
+;
+; User Interface:   After test prints 100 lines, it waits for user serial input
+;                   ending with return key. It outputs that input 100 times
+;                   and repeats.
 ;
 ; Error Handling:   None.
 ;
@@ -31,12 +37,12 @@
 ; Data Structures:  None.
 ;
 ; Known Bugs:       None.
-; Limitations:      The fact that there are three motors is hard coded.
+; Limitations:      Hard coded Baud rate = 9600, No parity, 8 bit data.
 ;
 ; Revision History:
-;    11/19/13  Archan Luhar     Created hw5main.asm. Contains main function
-;                               that calls chip initialization functions, and
-;                               test function..
+;    1/16/14  Archan Luhar      Created hw7main.asm. Contains main function
+;                               that calls initialization functions, and
+;                               test function.
 
 
 CGROUP  GROUP   CODE
@@ -52,7 +58,7 @@ CODE    SEGMENT PUBLIC 'CODE'
     EXTRN   InitSerialPort:NEAR
     EXTRN   SerialIOTest:NEAR
 
-
+; Code starts here
 START:  
 MAIN:
     MOV     AX, DGROUP              ; Initialize the stack pointer
@@ -63,12 +69,12 @@ MAIN:
     MOV     DS, AX
 
     CALL    InitCS
-    CALL    InitSerialPort            ; Initializes the serial port
+    CALL    InitSerialPort          ; Initializes the serial port
     
     STI                             ; Enable interrupts so event handlers can
                                     ; function.
     
-    CALL    SerialIOTest
+    CALL    SerialIOTest            ; Invoke the test function
 
 EndMain:
     HLT

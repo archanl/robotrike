@@ -6,29 +6,30 @@
 ;                                 SERIAL Routine                             ;
 ;                                    EE/CS 51                                ;
 ;                                  Archan Luhar                              ;
-;                                 TA: Joe Greef                              ;
+;                                 TA:  Joe Greef                             ;
 ;                                                                            ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-    
+
+; Import necessary definitions and macros
 $INCLUDE(general.inc)
 $INCLUDE(queue.inc)
 $INCLUDE(serial.inc)
 $INCLUDE(simpmac.inc)
 
 ; setup code and data groups
-CGROUP  GROUP   CODE
-DGROUP  GROUP   DATA
+    CGROUP  GROUP   CODE
+    DGROUP  GROUP   DATA
 
 
 ; segment register assumptions
-        ASSUME  CS:CGROUP, DS:DGROUP, ES:NOTHING, SS:DGROUP
+    ASSUME  CS:CGROUP, DS:DGROUP, ES:NOTHING, SS:DGROUP
 
 
 
 CODE    SEGMENT PUBLIC 'CODE'
 
-
+; External References
     EXTRN   QueueInit:NEAR
     EXTRN   QueueEmpty:NEAR
     EXTRN   QueueFull:NEAR
@@ -39,125 +40,105 @@ CODE    SEGMENT PUBLIC 'CODE'
 
 ; InitSerialPort
 ;
-; Description:      This procedure initializes the serial port.  It sets it to
+; Description:      This procedure initializes the 82050 port.  It sets it to
 ;                   eight data bits, no parity, one stop bit, 9600 baud, and
 ;                   no interrupts.  DTR and RTS are both set active.
 ;
-; Operation:        The initialization values are written to the serial chip
-;                   and the error status is cleared.
+; Operation:        The initialization values are written to the serial and
+;                   interrupt chips.
+;                   The shared variables are initialized and the error status is
+;                   cleared.
 ;
 ; Arguments:        None.
 ; Return Value:     None.
 ;
-; Local Variables:  None.
-; Shared Variables: ErrorBits - set to NO_ERROR.
+; Local Variables:  SI - sendQueue offset
+;                   AX, BL - QueueInit parameters
+;                   DX - hw register addresses
+;                   AL - values to OUT to hw registers
+;
+; Shared Variables: ErrorBits       (W)
+;                   sendQueue       (W)
+;                   KickstartNeeded (W)
+;
 ; Global Variables: None.
 ;
 ; Input:            None.
-; Output:           DTR and RTS are set to one.
+; Output:           Control and interrupt registers
 ;
 ; Error Handling:   None.
 ;
 ; Algorithms:       None.
 ; Data Structures:  None.
 ;
-; Registers Used:   AX, DX
-; Stack Depth:      0 words
+; Registers Used:   flags (call)
+; Stack Depth:      4 words + call
 ;
-; Author:           Glen George
-; Last Modified:    Feb. 6, 2003
+; Author:           Glen George, Archan Luhar
+; Last Modified:    Jan. 20, 2014
 
 InitSerialPort  PROC    NEAR
                 PUBLIC  InitSerialPort
 
-
-Init82050:                              ;initialize the 82050
+StartInitSerialPort:                ; Save the registers temporarily used
     PUSH AX
     PUSH BX
     PUSH DX
     PUSH SI
-    
+
+SetSerialSharedVars:    
     MOV     SI, OFFSET(sendQueue)   ; Let SI be the pointer to the queue
     MOV     AX, SERIAL_QUEUE_LENGTH ; Set size to that defined in inc
-    MOV     BL, QUEUE_BYTE_ELEM     ; Set element size to byte
-    CALL    QueueInit               ; Initialize the queue
+    MOV     BL, QUEUE_BYTE_ELEM     ; Set element size to byte (characters)
+    CALL    QueueInit               ; Initialize the queue metadata.
     
-    MOV     DX, SERIAL_LCR          ;talk to the baud rate divisor registers
-    MOV     AL, ENABLE_BRG_ACC
+    MOV     KickstartNeeded, TRUE
+
+    MOV     ErrorBits, NO_ERROR     ; Reset the error status
+
+SetupSerialHardware:
+    MOV     DX, SERIAL_LCR          ; Talk to the baud rate divisor registers
+    MOV     AL, ENABLE_BRG_ACC      ; (LCR is now in baud rate set mode)
     OUT     DX, AL
 
-    MOV     DX, SERIAL_BRG_DIV      ;set the baud rate divisor
+    MOV     DX, SERIAL_BRG_DIV      ; Set the baud rate divisor
     MOV     AX, BAUD9600
-    OUT     DX, AL                  ;write a byte at a time
+    OUT     DX, AL                  ; Write a byte at a time. Low byte
     INC     DX
     MOV     AL, AH
+    OUT     DX, AL                  ; High byte
+
+    MOV     DX, SERIAL_LCR          ; Set all parameters in the line control reg
+    MOV     AL, SERIAL_SETUP
+    OUT     DX, AL                  ; (also changes access back to Rx/Tx)
+    
+    MOV     DX, SERIAL_IER          ; Serial Interrupt enable register
+    MOV     AL, SERIAL_EN_IRQ       ; Enable interrupts
     OUT     DX, AL
 
-    MOV     DX, SERIAL_LCR          ;set all parameters in the line
-    MOV     AL, SERIAL_SETUP        ;    control register
-    OUT     DX, AL                  ;   (also changes access back to Rx/Tx)
-
+SetupSerialInterrupts:
     ; Install serial interrupt handler into the vector table
     %InstallVector(INT_VEC_SERIAL, SerialInterruptHandler)
-    
-    MOV     DX, SERIAL_IER          ;enable interrupts
-    MOV     AL, SERIAL_EN_IRQ
-    OUT     DX, AL
 
-    ;MOV     DX, SERIAL_MCR                  ;set the modem control lines
-    ;MOV     AL, SERIAL_RTS + SERIAL_DTR     ;RTS and DTR both on
-    ;OUT     DX, AL
-
-    ;JMP    InitErrorStatus         ;now initialize the error status
-
-InitKickstartStatus:
-    MOV KickstartNeeded, TRUE
-
-InitErrorStatus:                        ;reset the error status
-    MOV     ErrorBits, NO_ERROR
-    ;JMP    EndInitSerialPort       ;all done initializing error status
-
-    MOV     DX, SERIAL_ICR    ; Setup the interrupt control register
+    MOV     DX, SERIAL_ICR          ; Setup the relevant interrupt control reg
     MOV     AX, SERIAL_ICR_VAL
     OUT     DX, AL
-    MOV DX, INTCtrlrEOI             ; Send serial EOI
-    MOV AX, SerialEOI
-    OUT DX, AL
+
+    MOV     DX, INTCtrlrEOI         ; Send serial EOI to reset the interrupts
+    MOV     AX, SerialEOI
+    OUT     DX, AL
         
-EndInitSerialPort:                      ;done initializing the serial port -
+EndInitSerialPort:                  ; Restore saved registers
     POP SI
     POP DX
     POP BX
     POP AX
-    RET                             ;   return
-
+    RET                             ; Return
 
 InitSerialPort  ENDP
 
 
 
-
-
-KickStartSerialTx   PROC    NEAR
-                    PUBLIC  KickStartSerialTx
-    
-BeginKickStartSerialTx:
-    PUSH DX
-    PUSH AX
-
-DoTxKickstart:
-    MOV DX, SERIAL_IER          ;enable interrupts
-    MOV AL, SERIAL_EN_IRQ_NOTX
-    OUT DX, AL
-    MOV AL, SERIAL_EN_IRQ
-    OUT DX, AL
-
-EndKickStartSerialTx:
-    POP AX
-    POP DX
-    RET
-    
-KickStartSerialTx   ENDP
 
 
 ; SerialPutChar
@@ -173,9 +154,10 @@ KickStartSerialTx   ENDP
 ;
 ; Return Value:     Carry flag - clear if successful, set if failed (full queue)
 ;
-; Local Variables:  -
+; Local Variables:  SI - offset of sendQueue
 ;
-; Shared Variables: serial_queue - READ/WRITE
+; Shared Variables: sendQueue       (R/W)
+;                   KickstartNeeded (R/W)
 ;
 ; Global Variables: None.
 ;
@@ -187,54 +169,14 @@ KickStartSerialTx   ENDP
 ;
 ; Algorithms:       None.
 ;
-; Data Structures:  None.
+; Data Structures:  queues are used (sendQueue)
 ;
-; Registers Used:   Carry flag.
+; Registers Used:   flags (carry flag is return value)
 ;
-; Stack Depth:      .
+; Stack Depth:      1 word + calls
 ;
 ; Author:           Archan Luhar
 ; Last Modified:    11/25/2013
-;
-; Pseudocode
-; ----------
-;                   if serial_queue is not full:
-;                       serial_queue.enqueue(char)
-;                       clear carry flag
-;                   else:
-;                       set carry flag
-;                   return
-;
-; SerialPutChar
-;
-; Description:      This function outputs the passed character to the serial
-;                   port.  It does not return until it has output the
-;                   character (actually until it is written to the 82050).
-;
-; Operation:        The function loops waiting for the serial output channel
-;                   to be ready to transmit a character.  Once it is ready the
-;                   character is written.
-;
-; Arguments:        (SP + 2) - character to output to the serial channel.
-; Return Value:     None.
-;
-; Local Variables:  None.
-; Shared Variables: None.
-; Global Variables: None.
-;
-; Input:            None.
-; Output:           A character to the serial port.
-;
-; Error Handling:   None.
-;
-; Algorithms:       None.
-; Data Structures:  None.
-;
-; Registers Used:   flags, AX, DX
-; Stack Depth:      2 words
-;
-; Author:           Glen George
-; Last Modified:    Nov. 19, 1997
 
 SerialPutChar   PROC    NEAR
                 PUBLIC  SerialPutChar
@@ -243,7 +185,8 @@ StartSerialPutChar:                     ;get ready to output a character
     PUSH SI
     
 SerialPutCharCheckReady:
-    Call SerialOutRdy
+    MOV SI, OFFSET(sendQueue)
+    CALL QueueFull                      ; ZF gets set if queue is full
     JNZ PutSerialChar
     ;JZ SerialPutCharError
 
@@ -253,19 +196,18 @@ SerialPutCharError:
 
 PutSerialChar:                      ; Send the character now
     CLC                             ; Clear carry flag to indicate success
-    %CRITICAL_START
-    MOV SI, OFFSET(sendQueue)
-    Call Enqueue                    ; Argument is in AL, Queue location is in SI
+    %CRITICAL_START                 ; Macro pushes flag, saves carry flag 0
+    Call Enqueue                    ; Enqueue AL in sendQueue
 SerialPutCharKickCheck:
     CMP KickstartNeeded, FALSE
-    JE EndPutSerialChar
+    JE EndPutSerialChar             ; If kick start not needed, skip kickstart
     ;JNE SerialPutCharKickstart
 SerialPutCharKickstart:
-    CALL KickStartSerialTx
-    MOV KickstartNeeded, FALSE
+    CALL KickStartSerialTx          ; Else, kickstart
+    MOV KickstartNeeded, FALSE      ; And reset variable to FALSE
     ;JMP EndPutSerialChar
 EndPutSerialChar:
-    %CRITICAL_END
+    %CRITICAL_END                   ; Critical code ends here, restores flags
     ;JMP EndSerialPutChar
     
 EndSerialPutChar:
@@ -277,40 +219,47 @@ SerialPutChar   ENDP
 
 
 
-
 ; SerialInterruptHandler
 ;
-; Description:      Handles the serial queue data and also any received data.
+; Description:      Handles the serial error, received data, and transmit empty
+;                   interrupts. EnqueueEvent's received data/errors and
+;                   transmits data from the sendQueue.
 ;
-; Operation:        Enqueues events if char is received.
-;                   Sends chars if serial_queue is not empty.
+; Operation:        Enqueues events if char is received or error.
+;                   Sends chars if sendQueue is not empty. Sets KickStartNeeded
+;                   if sendQueue is empty after dequeueing. Sends proper EOI.
 ;
 ; Arguments:        None.
 ;
 ; Return Value:     None.
 ;
-; Local Variables:  char = received char
+; Local Variables:  AH - EnqueueEvent event type
+;                   AL - OUT values / queue values
+;                   DX - OUT registers
+;                   SI - sendQueue offset
 ;
-; Shared Variables: serial_queue - READ/WRITE
+; Shared Variables: sendQueue (R/W)
+;                   ErrorBits (W)
+;                   KickstartNeeded (W)
 ;
 ; Global Variables: None.
 ;
-; Input:            None.
+; Input:            Serial.
 ;
-; Output:           None.
+; Output:           Serial.
 ;
 ; Error Handling:   None.
 ;
 ; Algorithms:       None.
 ;
-; Data Structures:  None.
+; Data Structures:  queues are used (sendQueue)
 ;
-; Registers Used:   None.
+; Registers Used:   flags
 ;
-; Stack Depth:      .
+; Stack Depth:      3 words + calls
 ;
 ; Author:           Archan Luhar
-; Last Modified:    11/25/2013
+; Last Modified:    1/20/2014
 
 SerialInterruptHandler  PROC NEAR
 
@@ -368,121 +317,72 @@ SerialInterruptHandler  PROC NEAR
         MOV AX, SerialEOI
         OUT DX, AL
         
-        POP SI
+        POP SI                          ; Restore registers
         POP DX
         POP AX
-        IRET
+        IRET                            ; IRET because this handles an interrupt
 
 SerialInterruptHandler  ENDP
 
 
 
-
-; SetSerial.{Baud, Parity, DataSize}
+; KickStartSerialTx
 ;
-; Description:      Sets all the default serial parameters.
+; Description:      This procedure resets the THRE interrupt -- the transmit
+;                   holding register empty interrupt. This is needed when
+;                   it has been fired and subsequently the interrupt caught but
+;                   not handled with a new character to transmit. Thus, the
+;                   next character put into the transmit queue buffer will not
+;                   be sent unless this interrupt is kickstarted. Must call this
+;                   when KickstartNeeded shared variable is TRUE.
 ;
-; Operation:        Sets the baud rate, parity, data size. Uses specified
-;                   pre-processor defined EQU's.
+; Operation:        Outputs to the serial interrupt enable register
+;                   a value that turns off the THRE interrupt. Then it outputs
+;                   again another value that turns it on.
 ;
 ; Arguments:        None.
-;
 ; Return Value:     None.
 ;
-; Local Variables:  None.
+; Local Variables:  AX, DX - OUT value, OUT register
 ;
-; Shared Variables: serial_baud_rate    (WRITE)
-;                   serial_parity       (WRITE)
-;                   serial_data_size    (WRITE)
+; Shared Variables: None.
 ;
 ; Global Variables: None.
 ;
 ; Input:            None.
-;
-; Output:           Serial Controller.
+; Output:           Serial IER
 ;
 ; Error Handling:   None.
 ;
 ; Algorithms:       None.
-;
 ; Data Structures:  None.
 ;
-; Registers Used:   None.
-;
-; Stack Depth:      .
+; Registers Used:   flags
+; Stack Depth:      2 words
 ;
 ; Author:           Archan Luhar
-; Last Modified:    11/25/2013
-;
-; Pseudocode
-; 
-; set baud rate and serial_baud_rate from defined constant 
-; set parity and serial_parity from defined constant 
-; set data size and serial_data_size from defined constant 
-;
-;SerialGetChar   PROC    NEAR
-;                PUBLIC  SerialGetChar
-;
-;
-;StartSerialGetChar:                     ;get ready to read a character
-;        PUSH    AX
-;        PUSH    DX
-;
-;SerialGetCharWait:                      ;wait until have a character
-;        CALL    SerialInRdy             ;check if there is a character
-;        OR      AL, AL                  ;set flags based on return value
-;        JZ      SerialGetCharWait       ;loop until there is a character
-;        ;JNZ    GetSerialChar           ;otherwise have a character
-;
-;
-;GetSerialChar:                          ;get the character now
-;        MOV     DX, SERIAL_RX_REG       ;read it from the receive register
-;        IN      AL, DX
-;        MOV     AH, 0                   ;make sure AH is doesn't cause problems
-;        ;JMP    CheckErrorStatus        ;also check the error status
-;
-;CheckErrorStatus:                       ;see if there is a pending error
-;        TEST    ErrorBits, ERROR_BIT_MASK
-;        JZ      EndSerialGetChar        ;if no error, we're done
-;        ;JNZ    HaveSerialError         ;otherwise have an error
-;
-;HaveSerialError:                        ;have an error on the serial channel
-;        MOV     AX, GETCHAR_ERROR       ;set the error return value
-;        ;JMP    EndSerialGetChar        ;and all done now
-;
-;
-;EndSerialGetChar:                       ;done - just return
-;        POP DX
-;        POP AX
-;        RET
-;
-;
-;SerialGetChar   ENDP
+; Last Modified:    Jan. 20, 2014
 
-;SerialInRdy     PROC    NEAR
-;                PUBLIC  SerialInRdy
-;
-;    PUSH SI
-;    MOV SI, OFFSET(RxQueue)
-;    CALL QueueEmpty                      ; ZF gets set if queue is full
-;    POP SI
-;
-;SerialInRdy     ENDP
+KickStartSerialTx   PROC    NEAR
+                    PUBLIC  KickStartSerialTx
+    
+BeginKickStartSerialTx:
+    PUSH DX
+    PUSH AX
 
+DoTxKickstart:
+    MOV DX, SERIAL_IER          ;enable interrupts
+    MOV AL, SERIAL_EN_IRQ_NOTX
+    OUT DX, AL
+    MOV AL, SERIAL_EN_IRQ
+    OUT DX, AL
 
-SerialOutRdy    PROC    NEAR
-                PUBLIC  SerialOutRdy
-
-    PUSH SI
-    MOV SI, OFFSET(sendQueue)
-    CALL QueueFull                      ; ZF gets set if queue is full
-    POP SI
+EndKickStartSerialTx:
+    POP AX
+    POP DX
     RET
 
-SerialOutRdy    ENDP
-
-
-
+KickStartSerialTx   ENDP
 
 
 
@@ -541,12 +441,11 @@ CODE    ENDS
 
 
 
-
-;the data segment
+; Serial shared data in the data segment
 DATA SEGMENT PUBLIC 'DATA'
-    KickstartNeeded DB          ?
-    ErrorBits       DB          ?               ;error status from the 82050
-    sendQueue       queueSTRUC  <>
+    KickstartNeeded DB          ?               ; Kickstart needed boolean
+    ErrorBits       DB          ?               ; Error status from the 82050
+    sendQueue       queueSTRUC  <>              ; queue buffers Tx characters
 DATA ENDS
 
 

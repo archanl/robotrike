@@ -1,5 +1,5 @@
 # EE/CS 51
-# HW6 - Parallel Output (Motor Routines and Output, Laser Output)
+# HW7 - Serial Input Output
 # Archan Luhar
 # TA: Joe Greef
 
