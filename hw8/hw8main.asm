@@ -42,6 +42,7 @@ CODE    SEGMENT PUBLIC 'CODE'
 
 ; External references
     EXTRN   InitCS:NEAR
+    EXTRN   InitSerialParser:NEAR
     EXTRN   ParseTest:NEAR
 
 
@@ -55,6 +56,7 @@ MAIN:
     MOV     DS, AX
 
     CALL    InitCS
+    CALL    InitSerialParser
     
     STI
     
