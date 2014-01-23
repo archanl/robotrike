@@ -41,14 +41,15 @@ CODE    SEGMENT PUBLIC 'CODE'
     
 
 
-    
+; InitSerialParser Initializes the current state of the parser state machine.
+; This MUST be called before using ParseSerialChar.
 InitSerialParser    PROC    NEAR
                     PUBLIC  InitSerialParser
 
     MOV ParserCurrentState, ST_INITIAL
     RET
 
-ParseSerialChar ENDP
+InitSerialParser ENDP
 
 
 
@@ -56,15 +57,14 @@ ParseSerialChar ENDP
 
 ; ParseSerialChar
 ;
-; Description:      This function updates the state machine and executes
-;                   the proper functions according to the commands given.
+; Description:      This function updates the serial state machine and executes
+;                   the proper functions according to the commands given via
+;                   a series of characters (expected from serial input)
 ;
-; Operation:        This function receives a character and inserts it into
-;                   the current state of the parsing state machine.
-;                   Then it calls the action associated with the current state.
-;                   The action updates the state machine and if necessary
-;                   calls an external function with parameters built from
-;                   the values in thes tate machine.
+; Operation:        This function looks up the type and value of the given
+;                   character in a table. Then, it looks up what state to change
+;                   to next and what action to take in a table indexed by
+;                   the states and sub-indexed by the token type.
 ;
 ; Arguments:        AL = character to parse.
 ;
@@ -72,7 +72,7 @@ ParseSerialChar ENDP
 ;
 ; Local Variables:  None.
 ;
-; Shared Variables: currentState
+; Shared Variables: ParserCurrentState (R/W)
 ;
 ; Global Variables: None.
 ;
@@ -80,18 +80,18 @@ ParseSerialChar ENDP
 ;
 ; Output:           None.
 ;
-; Error Handling:   None.
+; Error Handling:   See Return Value.
 ;
 ; Algorithms:       None.
 ;
-; Data Structures:  None.
+; Data Structures:  State Machine (table lookup).
 ;
 ; Registers Used:   AX
 ;
-; Stack Depth:      .
+; Stack Depth:      2 words + call.
 ;
 ; Author:           Archan Luhar
-; Last Modified:    12/2/2013
+; Last Modified:    1/23/2014
 
 ParseSerialChar PROC    NEAR
                 PUBLIC  ParseSerialChar
@@ -101,6 +101,7 @@ StartParseSerialChar:
     PUSH CX
 
 DoNextToken:            ;get next input for state machine
+    AND AL, TOKEN_MASK
     CALL GetFPToken         ; Input is in AL, get token type and value
     MOV	CX, AX              ; Save token type (AH) and value (AL) in CX
 
@@ -206,7 +207,7 @@ GetInputNumber  PROC    NEAR
 BeginGetInputNumber:
     MOV AX, inputNumber
     CMP inputNumIsNegative, FALSE
-    JNE EndGetInputNumber
+    JE EndGetInputNumber
     NEG AX
 
 EndGetInputNumber:
@@ -252,6 +253,7 @@ doSetAbsSpeedFailure:
     ;JMP EndDoSetAbsSpeed
 
 EndDoSetAbsSpeed:
+    MOV AX, PARSE_SUCCESS
     POP BX
     RET
 
@@ -264,7 +266,7 @@ doSetRelSpeed           PROC    NEAR
 BeginDoSetRelSpeed:
     PUSH BX
 
-doSetAbsSpeedCheckValidNumber:
+doSetRelSpeedCheckValidNumber:
     CMP inputNumHasError, FALSE
     JNE doSetRelSpeedFailure
     ;JE doSetRelSpeedNumberValid
@@ -279,13 +281,14 @@ doSetRelSpeedNumberValid:
     CALL SetMotorSpeed
 
     MOV AX, PARSE_SUCCESS
-    JMP EndDoSetAbsSpeed
+    JMP EndDoSetRelSpeed
 
 doSetRelSpeedFailure:
     MOV AX, PARSE_FAILURE
     ;JMP EndDoSetRelSpeed
 
 EndDoSetRelSpeed:
+    MOV AX, PARSE_SUCCESS
     POP BX
     RET
 
@@ -320,6 +323,7 @@ doSetDirectionFailure:
     ;JMP EndDoSetDirection
 
 EndDoSetDirection:
+    MOV AX, PARSE_SUCCESS
     POP BX
     RET
 
@@ -347,6 +351,7 @@ doRotateTurretAbsFailure:
     ;JMP EndDoRotateTurretAbs
 
 EndDoRotateTurretAbs:
+    MOV AX, PARSE_SUCCESS
     RET
 
 doRotateTurretAbs           ENDP
@@ -378,6 +383,7 @@ doRotateTurretRelFailure:
     ;JMP EndDoRotateTurretRel
 
 EndDoRotateTurretRel:
+    MOV AX, PARSE_SUCCESS
     POP BX
     RET
 
@@ -405,6 +411,7 @@ doSetTurretElevationFailure:
     ;JMP EndDoSetTurretElevation
 
 EndDoSetTurretElevation:
+    MOV AX, PARSE_SUCCESS
     RET
 
 doSetTurretElevation    ENDP
@@ -459,8 +466,8 @@ TRANSITION_ENTRY        ENDS
 
 ;define a macro to make table a little more readable
 ;macro just does an offset of the action routine entries to build the STRUC
-%*DEFINE(TRANSITION(nxtst, act1, act2))  (
-    TRANSITION_ENTRY< %nxtst, OFFSET(%act1) >
+%*DEFINE(TRANSITION(nextstate, action))  (
+    TRANSITION_ENTRY< %nextstate, OFFSET(%action) >
 )
 
 StateTable    LABEL    TRANSITION_ENTRY
@@ -489,13 +496,13 @@ StateTable    LABEL    TRANSITION_ENTRY
     %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ELE_TUR
     %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_ON
     %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_OFF
-    %TRANSITION(ST_ABS_SPEED_DIG, doNOP)            ;TOKEN_PLUS
+    %TRANSITION(ST_ABS_SPEED_DIGIT, doNOP)          ;TOKEN_PLUS
     %TRANSITION(ST_ERROR, doError)                  ;TOKEN_MINUS
-    %TRANSITION(ST_ABS_SPEED_DIG, inputNumDigit)    ;TOKEN_DIGIT
+    %TRANSITION(ST_ABS_SPEED_DIGIT, inputNumDigit)  ;TOKEN_DIGIT
     %TRANSITION(ST_INITIAL, doNOP)                  ;TOKEN_RETURN
     %TRANSITION(ST_ABS_SPEED, doNOP)                ;TOKEN_OTHER
 
-    ;Current State = ST_ABS_SPEED_DIG               Input Token Type
+    ;Current State = ST_ABS_SPEED_DIGIT             Input Token Type
     %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ABS_SPEED
     %TRANSITION(ST_ERROR, doError)                  ;TOKEN_REL_SPEED
     %TRANSITION(ST_ERROR, doError)                  ;TOKEN_SET_DIR
@@ -505,9 +512,9 @@ StateTable    LABEL    TRANSITION_ENTRY
     %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_OFF
     %TRANSITION(ST_ERROR, doError)                  ;TOKEN_PLUS
     %TRANSITION(ST_ERROR, doError)                  ;TOKEN_MINUS
-    %TRANSITION(ST_ABS_SPEED_DIG, inputNumDigit)    ;TOKEN_DIGIT
+    %TRANSITION(ST_ABS_SPEED_DIGIT, inputNumDigit)  ;TOKEN_DIGIT
     %TRANSITION(ST_INITIAL, doSetAbsSpeed)          ;TOKEN_RETURN
-    %TRANSITION(ST_ABS_SPEED_DIG, doNOP)            ;TOKEN_OTHER
+    %TRANSITION(ST_ABS_SPEED_DIGIT, doNOP)          ;TOKEN_OTHER
 
     ;;;;;;;;;;
 
@@ -519,13 +526,13 @@ StateTable    LABEL    TRANSITION_ENTRY
     %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ELE_TUR
     %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_ON
     %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_OFF
-    %TRANSITION(ST_REL_SPEED_DIG, doNOP)            ;TOKEN_PLUS
-    %TRANSITION(ST_REL_SPEED_DIG, inputNumNeg)      ;TOKEN_MINUS
-    %TRANSITION(ST_REL_SPEED_DIG, inputNumDigit)    ;TOKEN_DIGIT
+    %TRANSITION(ST_REL_SPEED_DIGIT, doNOP)          ;TOKEN_PLUS
+    %TRANSITION(ST_REL_SPEED_DIGIT, inputNumNeg)    ;TOKEN_MINUS
+    %TRANSITION(ST_REL_SPEED_DIGIT, inputNumDigit)  ;TOKEN_DIGIT
     %TRANSITION(ST_INITIAL, doNOP)                  ;TOKEN_RETURN
     %TRANSITION(ST_REL_SPEED, doNOP)                ;TOKEN_OTHER
 
-    ;Current State = ST_REL_SPEED_DIG               Input Token Type
+    ;Current State = ST_REL_SPEED_DIGIT             Input Token Type
     %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ABS_SPEED
     %TRANSITION(ST_ERROR, doError)                  ;TOKEN_REL_SPEED
     %TRANSITION(ST_ERROR, doError)                  ;TOKEN_SET_DIR
@@ -535,9 +542,9 @@ StateTable    LABEL    TRANSITION_ENTRY
     %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_OFF
     %TRANSITION(ST_ERROR, doError)                  ;TOKEN_PLUS
     %TRANSITION(ST_ERROR, doError)                  ;TOKEN_MINUS
-    %TRANSITION(ST_REL_SPEED_DIG, inputNumDigit)    ;TOKEN_DIGIT
+    %TRANSITION(ST_REL_SPEED_DIGIT, inputNumDigit)  ;TOKEN_DIGIT
     %TRANSITION(ST_INITIAL, doSetRelSpeed)          ;TOKEN_RETURN
-    %TRANSITION(ST_REL_SPEED_DIG, doNOP)            ;TOKEN_OTHER
+    %TRANSITION(ST_REL_SPEED_DIGIT, doNOP)          ;TOKEN_OTHER
 
     ;;;;;;;;;;
     
@@ -879,7 +886,7 @@ GetFPToken    ENDP
         %TABENT(TOKEN_ABS_SPEED, 's');Set Absolute Speed Command
         %TABENT(TOKEN_ROT_TUR, 't')  ;Rotate Turret Command
         %TABENT(TOKEN_OTHER, 'u')    ;u
-        %TABENT(TOKEN_OTHER, 'v')    ;v
+        %TABENT(TOKEN_REL_SPEED, 'v');Set Relative Speed Command
         %TABENT(TOKEN_OTHER, 'w')    ;w
         %TABENT(TOKEN_OTHER, 'x')    ;x
         %TABENT(TOKEN_OTHER, 'y')    ;y

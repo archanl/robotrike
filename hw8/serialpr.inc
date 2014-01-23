@@ -1,3 +1,5 @@
+; Serial Parser Include File
+
 ; Serial Processing Definitions
 PARSE_SUCCESS   EQU 0
 PARSE_FAILURE   EQU 1
@@ -13,7 +15,7 @@ INPUT_NUM_BASE  EQU 10
 ST_INITIAL                  EQU 0
 
 ST_ABS_SPEED                EQU 1
-ST_ABS_SPEED_DIG            EQU 2
+ST_ABS_SPEED_DIGIT          EQU 2
 
 ST_REL_SPEED                EQU 3
 ST_REL_SPEED_DIGIT          EQU 4
