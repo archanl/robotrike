@@ -6,6 +6,8 @@ STATIONARY_SPEED            EQU 0       ; Default movement state
 DEFAULT_ANGLE               EQU 0       ; Default movement orientation state
 NO_CHANGE_ANGLE             EQU -32768  ; Don't change if angle parameter is =
 NO_CHANGE_SPEED             EQU 65535  ; Don't change if speed parameter is =
+MAX_SPEED                   EQU 65534
+
 
 
 ; PARALLEL HARDWARE CONFIGURATION, OUTPUT SELECTORS, AND BEHAVIOR BITS:

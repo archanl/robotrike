@@ -119,8 +119,15 @@ DoActions:              ;do the action (should affect AX, return value)
 
 DoTransition:				            ; Update the current state to
     MOV CL, CS:StateTable[BX].NEXTSTATE ; the next state specified
+    CMP AX, PARSE_SUCCESS
+    JNE ResetParserState
     MOV ParserCurrentState, CL          ; in the table entry
+    JMP EndParseSerialChar
 
+ResetParserState:
+    MOV ParserCurrentState, ST_INITIAL
+    ;JMP EndParseSerialChar
+    
 EndParseSerialChar:
     POP CX
     POP BX
@@ -136,7 +143,6 @@ ParseSerialChar ENDP
 inputNumClear   PROC    NEAR
     
     MOV inputNumIsNegative, FALSE
-    MOV inputNumHasError, FALSE
     MOV inputNumber, 0
     
     MOV AX, PARSE_SUCCESS
@@ -166,7 +172,7 @@ BeginInputNumDigit:
     PUSH CX
     PUSH DX
 
-InputNumDigitAddNewDigit:
+InputNumDigitMakeSpace:
     ; Let CX be the new digit
     MOV CL, AL
     XOR CH, CH
@@ -174,12 +180,24 @@ InputNumDigitAddNewDigit:
     ; Get the current number and multiply it by 10 (shift places to the left)
     MOV AX, inputNumber
     MOV BX, INPUT_NUM_BASE
+
+    CMP inputNumIsNegative, TRUE
+    JE InputNumDigitSubDigit
+    ;JNE InputNumDigitAddDigit
+
+InputNumDigitAddDigit:
     MUL BX                      ; (DX|AX) <-- AX * BX
-    
-    ; Add the 
+    JO InputNumDigitFailure
     ADD AX, CX
     JO InputNumDigitFailure
-    ;JNO InputNumDigitSuccess
+    JMP InputNumDigitSuccess
+
+InputNumDigitSubDigit:
+    IMUL BX                      ; (DX|AX) <-- AX * BX
+    JO InputNumDigitFailure
+    SUB AX, CX
+    JO InputNumDigitFailure
+    ;JMP InputNumDigitSuccess
 
 InputNumDigitSuccess:
     MOV inputNumber, AX
@@ -187,7 +205,6 @@ InputNumDigitSuccess:
     JMP EndInputNumDigit
 
 InputNumDigitFailure:
-    MOV inputNumHasError, TRUE
     MOV AX, PARSE_FAILURE
     ;JMP EndInputNumDigit
 
@@ -199,21 +216,6 @@ EndInputNumDigit:
 
 inputNumDigit   ENDP
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Get true input value
-GetInputNumber  PROC    NEAR
-
-BeginGetInputNumber:
-    MOV AX, inputNumber
-    CMP inputNumIsNegative, FALSE
-    JE EndGetInputNumber
-    NEG AX
-
-EndGetInputNumber:
-    RET
-
-GetInputNumber  ENDP
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -236,23 +238,10 @@ doSetAbsSpeed           PROC    NEAR
 BeginDoSetAbsSpeed:
     PUSH BX
 
-doSetAbsSpeedCheckValidNumber:
-    CMP inputNumHasError, FALSE
-    JNE doSetAbsSpeedFailure
-    ;JE doSetAbsSpeedNumberValid
-
-doSetAbsSpeedNumberValid:
-    CALL GetInputNumber
+    MOV AX, inputNumber
     MOV BX, NO_CHANGE_ANGLE
     CALL SetMotorSpeed
-    MOV AX, PARSE_SUCCESS
-    JMP EndDoSetAbsSpeed
 
-doSetAbsSpeedFailure:
-    MOV AX, PARSE_FAILURE
-    ;JMP EndDoSetAbsSpeed
-
-EndDoSetAbsSpeed:
     MOV AX, PARSE_SUCCESS
     POP BX
     RET
@@ -266,25 +255,39 @@ doSetRelSpeed           PROC    NEAR
 BeginDoSetRelSpeed:
     PUSH BX
 
-doSetRelSpeedCheckValidNumber:
-    CMP inputNumHasError, FALSE
-    JNE doSetRelSpeedFailure
-    ;JE doSetRelSpeedNumberValid
-
-doSetRelSpeedNumberValid:
-    CALL GetInputNumber
-    MOV BX, AX
     CALL GetMotorSpeed
-    ADD AX, BX
+    MOV BX, inputNumber
+    CMP inputNumIsNegative, TRUE
+    JE doSetRelSpeedSatSub
+    ;JNE doSetRelSpeedSatAdd
 
+    
+doSetRelSpeedSatAdd:
+    ADD AX, BX
+    JNC doSetRelSpeedDoSet
+    ;JC doSetRelSpeedSatUp
+
+doSetRelSpeedSatUp:
+    MOV AX, MAX_SPEED
+    JMP doSetRelSpeedDoSet
+
+    
+doSetRelSpeedSatSub:
+    NEG BX
+    CMP BX, AX
+    JA doSetRelSpeedSatDown
+    SUB AX, BX
+    JMP doSetRelSpeedDoSet
+
+doSetRelSpeedSatDown:
+    MOV AX, 0
+    ;JMP doSetRelSpeedDoSet
+
+    
+doSetRelSpeedDoSet:
     MOV BX, NO_CHANGE_ANGLE
     CALL SetMotorSpeed
 
-    MOV AX, PARSE_SUCCESS
-    JMP EndDoSetRelSpeed
-
-doSetRelSpeedFailure:
-    MOV AX, PARSE_FAILURE
     ;JMP EndDoSetRelSpeed
 
 EndDoSetRelSpeed:
@@ -300,30 +303,43 @@ doSetDirection           PROC    NEAR
 
 BeginDoSetDirection:
     PUSH BX
+    PUSH DX
 
-doSetDirectionValidNumber:
-    CMP inputNumHasError, FALSE
-    JNE doSetDirectionFailure
-    ;JE doSetRelSpeedNumberValid
+    doSetDirectionNormalizeAngle:                 ; The following block of code normalizes
+        MOV AX, inputNumber         ; the given angle to be between 0 and 360
+        CMP AX, 0
+        JGE doSetDirectionAngleIsPositive
+    doSetDirectionAngleIsNegative:                ; If the angle given is negative then
+        NEG AX                      ; Make positive
+        XOR DX, DX
+        MOV BX, 360
+        DIV BX                      ; Divide by 360
+        MOV AX, DX                  ; Get the remainder
+        NEG AX                      ; Make negative again
+        ADD AX, 360                 ; Final angle is 360 - (given mod 360)
+        JMP doSetDirectionSetDirection
+    doSetDirectionAngleIsPositive:
+        XOR DX, DX                  ; If angle is positive, get its mod 360
+        MOV BX, 360
+        DIV BX
+        MOV AX, DX                  ; Final angle is (given mod 360)
+        ;JMP doSetDirectionSetDirection
 
-doSetDirectionNumberValid:
-    CALL GetInputNumber
+    
+doSetDirectionSetDirection:
     MOV BX, AX
     CALL GetMotorDirection
     ADD BX, AX
-
+    
     MOV AX, NO_CHANGE_SPEED
     CALL SetMotorSpeed
+    
 
-    MOV AX, PARSE_SUCCESS
-    JMP EndDoSetDirection
-
-doSetDirectionFailure:
-    MOV AX, PARSE_FAILURE
     ;JMP EndDoSetDirection
 
 EndDoSetDirection:
     MOV AX, PARSE_SUCCESS
+    POP DX
     POP BX
     RET
 
@@ -334,20 +350,9 @@ doSetDirection           ENDP
 doRotateTurretAbs           PROC    NEAR
 
 BeginDoRotateTurretAbs:
-doRotateTurretAbsCheckValidNumber:
-    CMP inputNumHasError, FALSE
-    JNE doRotateTurretAbsFailure
-    ;JE doSetAbsSpeedNumberValid
-
-doRotateTurretAbsNumberValid:
-    CALL GetInputNumber
+    MOV AX, inputNumber
     CALL SetTurretAngle
 
-    MOV AX, PARSE_SUCCESS
-    JMP EndDoRotateTurretAbs
-
-doRotateTurretAbsFailure:
-    MOV AX, PARSE_FAILURE
     ;JMP EndDoRotateTurretAbs
 
 EndDoRotateTurretAbs:
@@ -363,23 +368,9 @@ doRotateTurretRel           PROC    NEAR
 BeginDoRotateTurretRel:
     PUSH BX
 
-doRotateTurretRelCheckValidNumber:
-    CMP inputNumHasError, FALSE
-    JNE doRotateTurretRelFailure
-    ;JE doSetAbsSpeedNumberValid
+    MOV AX, inputNumber
+    CALL SetRelTurretAngle
 
-doRotateTurretRelNumberValid:
-    CALL GetInputNumber
-    MOV BX, AX
-    CALL GetTurretAngle
-    ADD AX, BX
-    CALL SetTurretAngle
-
-    MOV AX, PARSE_SUCCESS
-    JMP EndDoRotateTurretRel
-
-doRotateTurretRelFailure:
-    MOV AX, PARSE_FAILURE
     ;JMP EndDoRotateTurretRel
 
 EndDoRotateTurretRel:
@@ -394,20 +385,9 @@ doRotateTurretRel           ENDP
 doSetTurretElevation    PROC    NEAR
 
 BeginDoSetTurretElevation:
-doSetTurretElevationCheckValidNumber:
-    CMP inputNumHasError, FALSE
-    JNE doSetTurretElevationFailure
-    ;JE doSetAbsSpeedNumberValid
-
-doSetTurretElevationNumberValid:
-    CALL GetInputNumber
+    MOV AX, inputNumber
     CALL SetTurretElevation
 
-    MOV AX, PARSE_SUCCESS
-    JMP EndDoSetTurretElevation
-
-doSetTurretElevationFailure:
-    MOV AX, PARSE_FAILURE
     ;JMP EndDoSetTurretElevation
 
 EndDoSetTurretElevation:
@@ -480,38 +460,52 @@ StateTable    LABEL    TRANSITION_ENTRY
     %TRANSITION(ST_ELE_TUR, inputNumClear)          ;TOKEN_ELE_TUR
     %TRANSITION(ST_LASER_ON, doNOP)                 ;TOKEN_LAS_ON
     %TRANSITION(ST_LASER_OFF, doNOP)                ;TOKEN_LAS_OFF
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_PLUS
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_MINUS
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_DIGIT
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_PLUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_MINUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_DIGIT
     %TRANSITION(ST_INITIAL, doNOP)                  ;TOKEN_RETURN
     %TRANSITION(ST_INITIAL, doNOP)                  ;TOKEN_OTHER
 
     ;;;;;;;;;;
     
     ;Current State = ST_ABS_SPEED                   Input Token Type
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ABS_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_REL_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_SET_DIR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ROT_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ELE_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_ON
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_OFF
-    %TRANSITION(ST_ABS_SPEED_DIGIT, doNOP)          ;TOKEN_PLUS
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_MINUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ABS_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_REL_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_SET_DIR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ROT_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ELE_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_ON
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_OFF
+    %TRANSITION(ST_ABS_SPEED_SIGN, doNOP)           ;TOKEN_PLUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_MINUS
     %TRANSITION(ST_ABS_SPEED_DIGIT, inputNumDigit)  ;TOKEN_DIGIT
-    %TRANSITION(ST_INITIAL, doNOP)                  ;TOKEN_RETURN
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_RETURN
     %TRANSITION(ST_ABS_SPEED, doNOP)                ;TOKEN_OTHER
 
+    ;Current State = ST_ABS_SPEED_SIGN              Input Token Type
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ABS_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_REL_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_SET_DIR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ROT_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ELE_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_ON
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_OFF
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_PLUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_MINUS
+    %TRANSITION(ST_ABS_SPEED_DIGIT, inputNumDigit)  ;TOKEN_DIGIT
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_RETURN
+    %TRANSITION(ST_ABS_SPEED_SIGN, doNOP)           ;TOKEN_OTHER
+    
     ;Current State = ST_ABS_SPEED_DIGIT             Input Token Type
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ABS_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_REL_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_SET_DIR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ROT_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ELE_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_ON
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_OFF
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_PLUS
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_MINUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ABS_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_REL_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_SET_DIR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ROT_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ELE_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_ON
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_OFF
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_PLUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_MINUS
     %TRANSITION(ST_ABS_SPEED_DIGIT, inputNumDigit)  ;TOKEN_DIGIT
     %TRANSITION(ST_INITIAL, doSetAbsSpeed)          ;TOKEN_RETURN
     %TRANSITION(ST_ABS_SPEED_DIGIT, doNOP)          ;TOKEN_OTHER
@@ -519,29 +513,43 @@ StateTable    LABEL    TRANSITION_ENTRY
     ;;;;;;;;;;
 
     ;Current State = ST_REL_SPEED                   Input Token Type
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ABS_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_REL_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_SET_DIR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ROT_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ELE_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_ON
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_OFF
-    %TRANSITION(ST_REL_SPEED_DIGIT, doNOP)          ;TOKEN_PLUS
-    %TRANSITION(ST_REL_SPEED_DIGIT, inputNumNeg)    ;TOKEN_MINUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ABS_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_REL_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_SET_DIR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ROT_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ELE_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_ON
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_OFF
+    %TRANSITION(ST_REL_SPEED_SIGN, doNOP)           ;TOKEN_PLUS
+    %TRANSITION(ST_REL_SPEED_SIGN, inputNumNeg)     ;TOKEN_MINUS
     %TRANSITION(ST_REL_SPEED_DIGIT, inputNumDigit)  ;TOKEN_DIGIT
-    %TRANSITION(ST_INITIAL, doNOP)                  ;TOKEN_RETURN
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_RETURN
     %TRANSITION(ST_REL_SPEED, doNOP)                ;TOKEN_OTHER
 
+    ;Current State = ST_REL_SPEED_SIGN              Input Token Type
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ABS_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_REL_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_SET_DIR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ROT_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ELE_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_ON
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_OFF
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_PLUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_MINUS
+    %TRANSITION(ST_REL_SPEED_DIGIT, inputNumDigit)  ;TOKEN_DIGIT
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_RETURN
+    %TRANSITION(ST_REL_SPEED_SIGN, doNOP)           ;TOKEN_OTHER
+
     ;Current State = ST_REL_SPEED_DIGIT             Input Token Type
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ABS_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_REL_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_SET_DIR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ROT_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ELE_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_ON
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_OFF
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_PLUS
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_MINUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ABS_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_REL_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_SET_DIR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ROT_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ELE_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_ON
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_OFF
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_PLUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_MINUS
     %TRANSITION(ST_REL_SPEED_DIGIT, inputNumDigit)  ;TOKEN_DIGIT
     %TRANSITION(ST_INITIAL, doSetRelSpeed)          ;TOKEN_RETURN
     %TRANSITION(ST_REL_SPEED_DIGIT, doNOP)          ;TOKEN_OTHER
@@ -549,29 +557,43 @@ StateTable    LABEL    TRANSITION_ENTRY
     ;;;;;;;;;;
     
     ;Current State = ST_SET_DIR                     Input Token Type
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ABS_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_REL_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_SET_DIR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ROT_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ELE_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_ON
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_OFF
-    %TRANSITION(ST_SET_DIR_DIGIT, doNOP)            ;TOKEN_PLUS
-    %TRANSITION(ST_SET_DIR_DIGIT, inputNumNeg)      ;TOKEN_MINUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ABS_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_REL_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_SET_DIR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ROT_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ELE_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_ON
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_OFF
+    %TRANSITION(ST_SET_DIR_SIGN, doNOP)             ;TOKEN_PLUS
+    %TRANSITION(ST_SET_DIR_SIGN, inputNumNeg)       ;TOKEN_MINUS
     %TRANSITION(ST_SET_DIR_DIGIT, inputNumDigit)    ;TOKEN_DIGIT
-    %TRANSITION(ST_INITIAL, doNOP)                  ;TOKEN_RETURN
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_RETURN
     %TRANSITION(ST_SET_DIR, doNOP)                  ;TOKEN_OTHER
 
+    ;Current State = ST_SET_DIR_SIGN                Input Token Type
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ABS_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_REL_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_SET_DIR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ROT_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ELE_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_ON
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_OFF
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_PLUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_MINUS
+    %TRANSITION(ST_SET_DIR_DIGIT, inputNumDigit)    ;TOKEN_DIGIT
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_RETURN
+    %TRANSITION(ST_SET_DIR_SIGN, doNOP)             ;TOKEN_OTHER
+
     ;Current State = ST_SET_DIR_DIGIT               Input Token Type
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ABS_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_REL_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_SET_DIR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ROT_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ELE_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_ON
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_OFF
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_PLUS
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_MINUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ABS_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_REL_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_SET_DIR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ROT_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ELE_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_ON
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_OFF
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_PLUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_MINUS
     %TRANSITION(ST_SET_DIR_DIGIT, inputNumDigit)    ;TOKEN_DIGIT
     %TRANSITION(ST_INITIAL, doSetDirection)         ;TOKEN_RETURN
     %TRANSITION(ST_SET_DIR_DIGIT, doNOP)            ;TOKEN_OTHER
@@ -579,43 +601,57 @@ StateTable    LABEL    TRANSITION_ENTRY
     ;;;;;;;;;;
     
     ;Current State = ST_ROT_TUR                     Input Token Type
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ABS_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_REL_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_SET_DIR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ROT_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ELE_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_ON
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_OFF
-    %TRANSITION(ST_ROT_TUR_REL_DIGIT, doNOP)        ;TOKEN_PLUS
-    %TRANSITION(ST_ROT_TUR_REL_DIGIT, inputNumNeg)  ;TOKEN_MINUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ABS_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_REL_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_SET_DIR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ROT_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ELE_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_ON
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_OFF
+    %TRANSITION(ST_ROT_TUR_SIGN, doNOP)             ;TOKEN_PLUS
+    %TRANSITION(ST_ROT_TUR_SIGN, inputNumNeg)       ;TOKEN_MINUS
     %TRANSITION(ST_ROT_TUR_ABS_DIGIT, inputNumDigit);TOKEN_DIGIT
-    %TRANSITION(ST_INITIAL, doNOP)                  ;TOKEN_RETURN
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_RETURN
     %TRANSITION(ST_ROT_TUR, doNOP)                  ;TOKEN_OTHER
 
+    ;Current State = ST_ROT_TUR_SIGN                Input Token Type
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ABS_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_REL_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_SET_DIR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ROT_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ELE_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_ON
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_OFF
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_PLUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_MINUS
+    %TRANSITION(ST_ROT_TUR_REL_DIGIT, inputNumDigit);TOKEN_DIGIT
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_RETURN
+    %TRANSITION(ST_ROT_TUR_SIGN, doNOP)             ;TOKEN_OTHER
+
     ;Current State = ST_ROT_TUR_ABS_DIGIT           Input Token Type
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ABS_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_REL_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_SET_DIR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ROT_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ELE_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_ON
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_OFF
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_PLUS
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_MINUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ABS_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_REL_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_SET_DIR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ROT_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ELE_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_ON
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_OFF
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_PLUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_MINUS
     %TRANSITION(ST_ROT_TUR_ABS_DIGIT, inputNumDigit);TOKEN_DIGIT
     %TRANSITION(ST_INITIAL, doRotateTurretAbs)      ;TOKEN_RETURN
     %TRANSITION(ST_ROT_TUR_ABS_DIGIT, doNOP)        ;TOKEN_OTHER
 
     ;Current State = ST_ROT_TUR_REL_DIGIT           Input Token Type
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ABS_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_REL_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_SET_DIR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ROT_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ELE_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_ON
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_OFF
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_PLUS
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_MINUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ABS_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_REL_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_SET_DIR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ROT_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ELE_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_ON
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_OFF
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_PLUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_MINUS
     %TRANSITION(ST_ROT_TUR_REL_DIGIT, inputNumDigit);TOKEN_DIGIT
     %TRANSITION(ST_INITIAL, doRotateTurretRel)      ;TOKEN_RETURN
     %TRANSITION(ST_ROT_TUR_REL_DIGIT, doNOP)        ;TOKEN_OTHER
@@ -623,29 +659,43 @@ StateTable    LABEL    TRANSITION_ENTRY
     ;;;;;;;;;;
 
     ;Current State = ST_ELE_TUR                     Input Token Type
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ABS_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_REL_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_SET_DIR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ROT_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ELE_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_ON
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_OFF
-    %TRANSITION(ST_ELE_TUR_DIGIT, doNOP)            ;TOKEN_PLUS
-    %TRANSITION(ST_ELE_TUR_DIGIT, inputNumNeg)      ;TOKEN_MINUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ABS_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_REL_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_SET_DIR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ROT_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ELE_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_ON
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_OFF
+    %TRANSITION(ST_ELE_TUR_SIGN, doNOP)             ;TOKEN_PLUS
+    %TRANSITION(ST_ELE_TUR_SIGN, inputNumNeg)       ;TOKEN_MINUS
     %TRANSITION(ST_ELE_TUR_DIGIT, inputNumDigit)    ;TOKEN_DIGIT
-    %TRANSITION(ST_INITIAL, doNOP)                  ;TOKEN_RETURN
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_RETURN
     %TRANSITION(ST_ELE_TUR, doNOP)                  ;TOKEN_OTHER
 
+    ;Current State = ST_ELE_TUR_SIGN                Input Token Type
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ABS_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_REL_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_SET_DIR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ROT_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ELE_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_ON
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_OFF
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_PLUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_MINUS
+    %TRANSITION(ST_ELE_TUR_DIGIT, inputNumDigit)    ;TOKEN_DIGIT
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_RETURN
+    %TRANSITION(ST_ELE_TUR_SIGN, doNOP)             ;TOKEN_OTHER
+
     ;Current State = ST_ELE_TUR_DIGIT               Input Token Type
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ABS_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_REL_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_SET_DIR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ROT_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ELE_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_ON
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_OFF
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_PLUS
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_MINUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ABS_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_REL_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_SET_DIR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ROT_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ELE_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_ON
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_OFF
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_PLUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_MINUS
     %TRANSITION(ST_ELE_TUR_DIGIT, inputNumDigit)    ;TOKEN_DIGIT
     %TRANSITION(ST_INITIAL, doSetTurretElevation)   ;TOKEN_RETURN
     %TRANSITION(ST_ELE_TUR_DIGIT, doNOP)            ;TOKEN_OTHER
@@ -653,48 +703,35 @@ StateTable    LABEL    TRANSITION_ENTRY
     ;;;;;;;;;;
 
     ;Current State = ST_LASER_ON                    Input Token Type
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ABS_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_REL_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_SET_DIR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ROT_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ELE_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_ON
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_OFF
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_PLUS
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_MINUS
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_DIGIT
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ABS_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_REL_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_SET_DIR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ROT_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ELE_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_ON
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_OFF
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_PLUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_MINUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_DIGIT
     %TRANSITION(ST_INITIAL, doLaserOn)              ;TOKEN_RETURN
     %TRANSITION(ST_LASER_ON, doNOP)                 ;TOKEN_OTHER
 
     ;Current State = ST_LASER_OFF                   Input Token Type
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ABS_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_REL_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_SET_DIR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ROT_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ELE_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_ON
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_OFF
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_PLUS
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_MINUS
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_DIGIT
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ABS_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_REL_SPEED
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_SET_DIR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ROT_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_ELE_TUR
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_ON
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_LAS_OFF
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_PLUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_MINUS
+    %TRANSITION(ST_INITIAL, doError)                ;TOKEN_DIGIT
     %TRANSITION(ST_INITIAL, doLaserOff)             ;TOKEN_RETURN
     %TRANSITION(ST_LASER_OFF, doNOP)                ;TOKEN_OTHER
 
     ;;;;;;;;;;
 
-    ;Current State = ST_ERROR                       Input Token Type
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ABS_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_REL_SPEED
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_SET_DIR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ROT_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_ELE_TUR
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_ON
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_LAS_OFF
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_PLUS
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_MINUS
-    %TRANSITION(ST_ERROR, doError)                  ;TOKEN_DIGIT
-    %TRANSITION(ST_INITIAL, doNOP)                  ;TOKEN_RETURN
-    %TRANSITION(ST_ERROR, doNOP)                    ;TOKEN_OTHER
 
     
     
@@ -927,7 +964,6 @@ DATA SEGMENT PUBLIC 'DATA'
     
     ; Shared variables necessary for parsing input digits
     inputNumIsNegative  DB  ?
-    inputNumHasError    DB  ?
     inputNumber         DW  ?
 DATA ENDS
 

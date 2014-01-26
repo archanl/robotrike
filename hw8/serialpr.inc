@@ -15,27 +15,30 @@ INPUT_NUM_BASE  EQU 10
 ST_INITIAL                  EQU 0
 
 ST_ABS_SPEED                EQU 1
-ST_ABS_SPEED_DIGIT          EQU 2
+ST_ABS_SPEED_SIGN           EQU 2
+ST_ABS_SPEED_DIGIT          EQU 3
 
-ST_REL_SPEED                EQU 3
-ST_REL_SPEED_DIGIT          EQU 4
+ST_REL_SPEED                EQU 4
+ST_REL_SPEED_SIGN           EQU 5
+ST_REL_SPEED_DIGIT          EQU 6
 
-ST_SET_DIR                  EQU 5
-ST_SET_DIR_DIGIT            EQU 6
+ST_SET_DIR                  EQU 7
+ST_SET_DIR_SIGN             EQU 8
+ST_SET_DIR_DIGIT            EQU 9
 
-ST_ROT_TUR                  EQU 7
-ST_ROT_TUR_ABS_DIGIT        EQU 8
-ST_ROT_TUR_REL_DIGIT        EQU 9
+ST_ROT_TUR                  EQU 10
+ST_ROT_TUR_SIGN             EQU 11
+ST_ROT_TUR_ABS_DIGIT        EQU 12
+ST_ROT_TUR_REL_DIGIT        EQU 13
 
-ST_ELE_TUR                  EQU 10
-ST_ELE_TUR_DIGIT            EQU 11
+ST_ELE_TUR                  EQU 14
+ST_ELE_TUR_SIGN             EQU 15
+ST_ELE_TUR_DIGIT            EQU 16
 
-ST_LASER_ON                 EQU 12
-ST_LASER_OFF                EQU 13
+ST_LASER_ON                 EQU 17
+ST_LASER_OFF                EQU 18
 
-ST_ERROR                    EQU 14
-
-NUM_STATES                  EQU 15
+NUM_STATES                  EQU 19
 
 
 ; Token types
