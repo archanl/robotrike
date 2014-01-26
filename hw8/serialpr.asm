@@ -10,6 +10,26 @@
 ;                                                                            ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+; This file contains functions to handle characters as they come linearly via
+; the serial port. A state machine is used to keep track of the type and values
+; of the characters that are being processed.
+;
+; The included public functions are:
+;   - InitSerialParser
+;           Initializes the current state of the state machine. MUST be called
+;           before using ParseSerialChar.
+;   - ParseSerialChar
+;           Given a character, update the state machine and call relevant
+;           external functions as the command is described from the char stream.
+;
+; Revision History:
+;        1/20/2013      Archan Luhar    Started coding structure of the SM
+;       11/23/2013      Archan Luhar    Finished coding
+;       11/25/2013      Archan Luhar    Finished debugging
+;       11/26/2013      Archan Luhar    Finished commenting
+
+
+
 ; Import necessary definitions and macros
 $INCLUDE(general.inc)
 $INCLUDE(serialpr.inc)
@@ -18,7 +38,6 @@ $INCLUDE(motors.inc)
 ; setup code and data groups
     CGROUP  GROUP   CODE
     DGROUP  GROUP   DATA
-
 
 ; segment register assumptions
     ASSUME  CS:CGROUP, DS:DGROUP, ES:NOTHING, SS:DGROUP
@@ -41,8 +60,42 @@ CODE    SEGMENT PUBLIC 'CODE'
     
 
 
-; InitSerialParser Initializes the current state of the parser state machine.
-; This MUST be called before using ParseSerialChar.
+
+; InitSerialParser
+;
+; Description:      This function initializes the state of the state machine
+;                   required for the serial parser. It MUST be called
+;                   before calling ParseSerialChar.
+;
+; Operation:        Sets the ParserCurrentState to the initial state ST_INITIAL.
+;
+; Arguments:        None.
+;
+; Return Value:     None.
+;
+; Local Variables:  None.
+;
+; Shared Variables: ParserCurrentState (W)
+;
+; Global Variables: None.
+;
+; Input:            None.
+;
+; Output:           None.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+;
+; Data Structures:  State Machine
+;
+; Registers Used:   None.
+;
+; Stack Depth:      0
+;
+; Author:           Archan Luhar
+; Last Modified:    1/23/2014
+
 InitSerialParser    PROC    NEAR
                     PUBLIC  InitSerialParser
 
@@ -68,9 +121,11 @@ InitSerialParser ENDP
 ;
 ; Arguments:        AL = character to parse.
 ;
-; Return Value:     AX = zero if successful, nonzero if there parsing error.
+; Return Value:     AX = 0 (PARSE_SUCCESS) or 1 (PARSE_FAILURE)
 ;
-; Local Variables:  None.
+; Local Variables:  CH, CL = token type and value
+;                   AX = rwo in table
+;                   BX = actual offset into table
 ;
 ; Shared Variables: ParserCurrentState (R/W)
 ;
@@ -134,6 +189,7 @@ EndParseSerialChar:
     RET
 
 ParseSerialChar ENDP
+
 
 
 
