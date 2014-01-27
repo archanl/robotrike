@@ -106,8 +106,6 @@ InitSerialParser ENDP
 
 
 
-
-
 ; ParseSerialChar
 ;
 ; Description:      This function updates the serial state machine and executes
@@ -135,7 +133,7 @@ InitSerialParser ENDP
 ;
 ; Output:           None.
 ;
-; Error Handling:   See Return Value.
+; Error Handling:   If parse error, sets current state to ST_INITIAL.
 ;
 ; Algorithms:       None.
 ;
@@ -192,10 +190,43 @@ ParseSerialChar ENDP
 
 
 
+; inputNumClear
+;
+; Description:      This function resets the input number shared variable as
+;                   well as the associated flags. Must call when starting
+;                   the generation of a number.
+;
+; Operation:        Set inputNumIsNegative to FALSE.
+;                   Set inputNumber to 0.
+;
+; Arguments:        None.
+;
+; Return Value:     AX = parsing status = PARSE_SUCCESS
+;
+; Local Variables:  None.
+;
+; Shared Variables: inputNumIsNegative (W)
+;                   inputNumber        (W)
+;
+; Global Variables: None.
+;
+; Input:            None.
+;
+; Output:           None.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+;
+; Data Structures:  None.
+;
+; Registers Used:   AX
+;
+; Stack Depth:      0
+;
+; Author:           Archan Luhar
+; Last Modified:    1/27/2014
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; clear bad number flag ; clear sign flag
 inputNumClear   PROC    NEAR
     
     MOV inputNumIsNegative, FALSE
@@ -207,8 +238,41 @@ inputNumClear   PROC    NEAR
 inputNumClear   ENDP
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; set sign flag
+; inputNumNeg
+;
+; Description:      This function sets the negative sign flag of the input
+;                   number to true. Should call when encountering a negative
+;                   (-) symbol.
+;
+; Operation:        Set inputNumIsNegative to TRUE.
+;
+; Arguments:        None.
+;
+; Return Value:     AX = parsing status = PARSE_SUCCESS
+;
+; Local Variables:  None.
+;
+; Shared Variables: inputNumIsNegative (W)
+;
+; Global Variables: None.
+;
+; Input:            None.
+;
+; Output:           None.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+;
+; Data Structures:  None.
+;
+; Registers Used:   AX
+;
+; Stack Depth:      0
+;
+; Author:           Archan Luhar
+; Last Modified:    1/27/2014
+
 inputNumNeg     PROC    NEAR
 
     MOV inputNumIsNegative, TRUE
@@ -219,12 +283,50 @@ inputNumNeg     PROC    NEAR
 inputNumNeg     ENDP
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; update input number
+; inputNumDigit
+;
+; Description:      This function updates the input number with a new digit.
+;                   For example a number 56 would be updated to 563 by calling
+;                   this function with the argument 3.
+;
+; Operation:        Signed multiply current number by 10. If overflow, fail.
+;                   Add digit to current number if positive. If overflow, fail.
+;                   Subtract digit from current number if negative. Fail on OF.
+;
+; Arguments:        AX = new digit
+;
+; Return Value:     AX = parsing status = PARSE_SUCCESS or PARSE_FAILURE
+;
+; Local Variables:  CX = new digit
+;                   BX = number base (10)
+;                   AX = new number
+;
+; Shared Variables: inputNumIsNegative (R)
+;                   inputNumber        (R/W)
+;
+; Global Variables: None.
+;
+; Input:            None.
+;
+; Output:           None.
+;
+; Error Handling:   None.
+;
+; Algorithms:       Multiply current number by 10 and add/subtract new digit.
+;
+; Data Structures:  None.
+;
+; Registers Used:   AX
+;
+; Stack Depth:      3
+;
+; Author:           Archan Luhar
+; Last Modified:    1/27/2014
+
 inputNumDigit   PROC    NEAR
 
 BeginInputNumDigit:
-    PUSH BX
+    PUSH BX                     ; Save registers
     PUSH CX
     PUSH DX
 
@@ -236,243 +338,631 @@ InputNumDigitMakeSpace:
     ; Get the current number and multiply it by 10 (shift places to the left)
     MOV AX, inputNumber
     MOV BX, INPUT_NUM_BASE
+    IMUL BX                     ; (DX|AX) <-- AX * BX
+    JO InputNumDigitFailure     ; Fail if overflows
 
+    ; Jump to correct label based on if the current number is pos. or neg.
     CMP inputNumIsNegative, TRUE
     JE InputNumDigitSubDigit
     ;JNE InputNumDigitAddDigit
 
 InputNumDigitAddDigit:
-    IMUL BX                      ; (DX|AX) <-- AX * BX
-    JO InputNumDigitFailure
+    ; Number is positive, add the digit
     ADD AX, CX
-    JO InputNumDigitFailure
+    JO InputNumDigitFailure     ; Fail if overflows
     JMP InputNumDigitSuccess
 
 InputNumDigitSubDigit:
-    IMUL BX                      ; (DX|AX) <-- AX * BX
-    JO InputNumDigitFailure
+    ; Number is negative, subtract the digit
     SUB AX, CX
-    JO InputNumDigitFailure
+    JO InputNumDigitFailure     ; Fail if overflows
     ;JMP InputNumDigitSuccess
 
 InputNumDigitSuccess:
+    ; Update the shared variable and indicate parsing success
     MOV inputNumber, AX
     MOV AX, PARSE_SUCCESS
     JMP EndInputNumDigit
 
 InputNumDigitFailure:
+    ; Don't update the shared variable and indicate parsing failure
     MOV AX, PARSE_FAILURE
     ;JMP EndInputNumDigit
 
-EndInputNumDigit:
+EndInputNumDigit:               ; Restore registers
     POP DX
     POP CX
     POP BX
-    RET
+    RET                         ; Return
 
 inputNumDigit   ENDP
 
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; doNOP
+;
+; Description:      This function does nothing but return PARSE_SUCCESS.
+;                   Should be the "transition" function of a state when
+;                   it is simply ignoring the character.
+;
+; Operation:        Return PARSE_SUCCESS in AX.
+;
+; Arguments:        None.
+;
+; Return Value:     AX = parsing status = PARSE_SUCCESS
+;
+; Local Variables:  None.
+;
+; Shared Variables: None.
+;
+; Global Variables: None.
+;
+; Input:            None.
+;
+; Output:           None.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+;
+; Data Structures:  None.
+;
+; Registers Used:   AX
+;
+; Stack Depth:      0
+;
+; Author:           Archan Luhar
+; Last Modified:    1/24/2014
+
 doNOP           PROC    NEAR
     MOV AX, PARSE_SUCCESS
     RET
 doNOP           ENDP
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; doError
+;
+; Description:      This function does nothing but return PARSE_FAILURE.
+;                   Should be the "transition" function of a state when
+;                   it encounters an invalid command/character.
+;
+; Operation:        Return PARSE_FAILURE in AX.
+;
+; Arguments:        None.
+;
+; Return Value:     AX = parsing status = PARSE_FAILURE
+;
+; Local Variables:  None.
+;
+; Shared Variables: None.
+;
+; Global Variables: None.
+;
+; Input:            None.
+;
+; Output:           None.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+;
+; Data Structures:  None.
+;
+; Registers Used:   AX
+;
+; Stack Depth:      0
+;
+; Author:           Archan Luhar
+; Last Modified:    1/24/2014
+
 doError         PROC    NEAR
     MOV AX, PARSE_FAILURE
     RET
 doError         ENDP
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; doSetAbsSpeed
+;
+; Description:      This function sets the motor speed according to the input
+;                   number generated.
+;                   Should be the "transition" function of the S state when
+;                   it encounters a return \r character.
+;
+; Operation:        Call SetMotorSpeed with inputNumber and NO_CHANGE_ANGLE.
+;                   Return PARSE_SUCCESS in AX.
+;
+; Arguments:        None.
+;
+; Return Value:     AX = parsing status = PARSE_SUCCESS
+;
+; Local Variables:  AX = inputNumber (speed)
+;                   BX = NO_CHANGE_ANGLE (angle)
+;
+; Shared Variables: inputNumber (R)
+;
+; Global Variables: None.
+;
+; Input:            None.
+;
+; Output:           None.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+;
+; Data Structures:  None.
+;
+; Registers Used:   AX
+;
+; Stack Depth:      1 word + call
+;
+; Author:           Archan Luhar
+; Last Modified:    1/24/2014
+
 doSetAbsSpeed           PROC    NEAR
 
-BeginDoSetAbsSpeed:
+    ; Save Register
     PUSH BX
 
+    ; Get input number as speed and don't change angle
     MOV AX, inputNumber
     MOV BX, NO_CHANGE_ANGLE
     CALL SetMotorSpeed
 
+    ; Successfully parsed
     MOV AX, PARSE_SUCCESS
+    
+    ; Pop Register and return
     POP BX
     RET
 
 doSetAbsSpeed           ENDP
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; doSetRelSpeed
+;
+; Description:      This function increases/decreases the motor speed as
+;                   determined by the inputNumber which signifies the
+;                   amount to change.
+;                   Should be the "transition" function of the V state when
+;                   it encounters a return \r character.
+;
+; Operation:        Determine new speed by getting current speed and adding the
+;                   input number to the current speed. If overflows when adding
+;                   saturate to MAX_SPEED. If underflows when subtracting then
+;                   saturate to 0.
+;                   Call SetMotorSpeed with new speed and NO_CHANGE_ANGLE.
+;                   Return PARSE_SUCCESS in AX.
+;
+; Arguments:        None.
+;
+; Return Value:     AX = parsing status = PARSE_SUCCESS
+;
+; Local Variables:  CX = temporary variable for storing old speed
+;                   AX = new speed (speed)
+;                   BX = NO_CHANGE_ANGLE (angle)
+;
+; Shared Variables: inputNumber (R)
+;
+; Global Variables: None.
+;
+; Input:            None.
+;
+; Output:           None.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+;
+; Data Structures:  None.
+;
+; Registers Used:   AX
+;
+; Stack Depth:      2 words + call
+;
+; Author:           Archan Luhar
+; Last Modified:    1/24/2014
+
 doSetRelSpeed           PROC    NEAR
 
 BeginDoSetRelSpeed:
-    PUSH BX
+    PUSH BX                             ; Save registers
     PUSH CX
 
-    CALL GetMotorSpeed
-    MOV BX, inputNumber
-    CMP inputNumIsNegative, TRUE
-    JE doSetRelSpeedSatSub
+    CALL GetMotorSpeed                  ; AX = Get the current motor speed
+    MOV BX, inputNumber                 ; BX = Get the change in speed
+    CMP inputNumIsNegative, TRUE        ; If change is negative
+    JE doSetRelSpeedSatSub              ; jump to proper point
     ;JNE doSetRelSpeedSatAdd
 
     
-doSetRelSpeedSatAdd:
-    MOV CX, AX
-    ADD AX, BX
-    CMP AX, CX
-    JAE doSetRelSpeedDoSet
-    ;JNA doSetRelSpeedSatUp
+doSetRelSpeedSatAdd:                    ; Increment motor speed and saturate
+    MOV CX, AX                          ; Temporarily store current speed
+    ADD AX, BX                          ; Add the change
+
+    CMP AX, NO_CHANGE_SPEED             ; If after change new speed is no change
+    JE doSetRelSpeedSatUp               ; speed, saturate to correct max speed.
+
+    CMP AX, CX                          ; If after the change the new speed
+    JAE doSetRelSpeedDoSet              ; is (unsigned) >= old, all is good.
+    ;JNA doSetRelSpeedSatUp             ; Else, saturate to max speed.
 
 doSetRelSpeedSatUp:
-    MOV AX, MAX_SPEED
+    MOV AX, MAX_SPEED                   ; Saturate to max speed and set it.
     JMP doSetRelSpeedDoSet
 
     
 doSetRelSpeedSatSub:
     NEG BX
-    CMP BX, AX
-    JA doSetRelSpeedSatDown
-    SUB AX, BX
-    JMP doSetRelSpeedDoSet
+    CMP BX, AX                          ; Check if change will result in
+    JA doSetRelSpeedSatDown             ; underflow. If so, saturate down.
+    SUB AX, BX                          ; Else subtract the |change| from
+    JMP doSetRelSpeedDoSet              ; current speed and set new speed.
 
 doSetRelSpeedSatDown:
-    MOV AX, 0
+    MOV AX, 0                           ; Saturate down to 0.
     ;JMP doSetRelSpeedDoSet
 
     
 doSetRelSpeedDoSet:
-    MOV BX, NO_CHANGE_ANGLE
-    CALL SetMotorSpeed
+    MOV BX, NO_CHANGE_ANGLE             ; Don't change angle
+    CALL SetMotorSpeed                  ; Set the new speed
 
     ;JMP EndDoSetRelSpeed
 
 EndDoSetRelSpeed:
-    MOV AX, PARSE_SUCCESS
-    POP CX
+    MOV AX, PARSE_SUCCESS               ; Indicate parsing success
+    POP CX                              ; Restore registers
     POP BX
-    RET
+    RET                                 ; Return
 
 doSetRelSpeed           ENDP
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; doSetDirection
+;
+; Description:      This function increases/decreases the motor direction as
+;                   determined by the inputNumber which signifies the
+;                   angle amount to change.
+;                   Should be the "transition" function of the D state when
+;                   it encounters a return \r character.
+;
+; Operation:        Determine new direction by getting current direciton and
+;                   adding the normalized input number angle to the current
+;                   direction. The angle is normalized by taking modulo
+;                   360 if positive, or 360 - (abs value modulo 360) if neg.
+;                   Call SetMotorSpeed with NO_CHANGE_SPEED and new angle.
+;                   Return PARSE_SUCCESS in AX.
+;
+; Arguments:        None.
+;
+; Return Value:     AX = parsing status = PARSE_SUCCESS
+;
+; Local Variables:  AX = temporary normalized new angle
+;                   AX = NO_CHANGE_SPEED (speed)
+;                   BX = new angle (angle)
+;
+; Shared Variables: inputNumber (R)
+;
+; Global Variables: None.
+;
+; Input:            None.
+;
+; Output:           None.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+;
+; Data Structures:  None.
+;
+; Registers Used:   AX
+;
+; Stack Depth:      2 words + call
+;
+; Author:           Archan Luhar
+; Last Modified:    1/24/2014
 doSetDirection           PROC    NEAR
 
 BeginDoSetDirection:
     PUSH BX
     PUSH DX
 
-    doSetDirectionNormalizeAngle:                 ; The following block of code normalizes
-        MOV AX, inputNumber         ; the given angle to be between 0 and 360
-        CMP AX, 0
-        JGE doSetDirectionAngleIsPositive
-    doSetDirectionAngleIsNegative:                ; If the angle given is negative then
-        NEG AX                      ; Make positive
-        XOR DX, DX
-        MOV BX, 360
-        DIV BX                      ; Divide by 360
-        MOV AX, DX                  ; Get the remainder
-        NEG AX                      ; Make negative again
-        ADD AX, 360                 ; Final angle is 360 - (given mod 360)
-        JMP doSetDirectionSetDirection
-    doSetDirectionAngleIsPositive:
-        XOR DX, DX                  ; If angle is positive, get its mod 360
-        MOV BX, 360
-        DIV BX
-        MOV AX, DX                  ; Final angle is (given mod 360)
-        ;JMP doSetDirectionSetDirection
+doSetDirectionNormalizeAngle:   ; The following block of code normalizes
+    MOV AX, inputNumber         ; the given angle to be between 0 and 360
+    CMP AX, 0
+    JGE doSetDirectionAngleIsPositive
 
-    
+doSetDirectionAngleIsNegative:  ; If the angle given is negative then
+    NEG AX                      ; Make positive
+
+    XOR DX, DX
+    MOV BX, 360
+    DIV BX                      ; Divide by 360
+
+    MOV AX, DX                  ; Get the remainder
+    NEG AX                      ; Make negative again
+    ADD AX, 360                 ; Final angle is 360 - (given mod 360)
+
+    JMP doSetDirectionSetDirection
+
+doSetDirectionAngleIsPositive:
+    XOR DX, DX                  ; If angle is positive, get its mod 360
+    MOV BX, 360
+    DIV BX
+    MOV AX, DX                  ; Final angle is (given mod 360)
+
+    ;JMP doSetDirectionSetDirection
+
 doSetDirectionSetDirection:
     MOV BX, AX
-    CALL GetMotorDirection
-    ADD BX, AX
+    CALL GetMotorDirection      ; Get the current direction and
+    ADD BX, AX                  ; add in the new normalized angle.
     
-    MOV AX, NO_CHANGE_SPEED
-    CALL SetMotorSpeed
-    
+    MOV AX, NO_CHANGE_SPEED     ; Don't change speed
+    CALL SetMotorSpeed          ; AX = no speed change, BX = new angle.
 
     ;JMP EndDoSetDirection
 
 EndDoSetDirection:
-    MOV AX, PARSE_SUCCESS
-    POP DX
+    MOV AX, PARSE_SUCCESS       ; Indicate parsing success
+    POP DX                      ; Restore registers
     POP BX
-    RET
+    RET                         ; All done, return
 
 doSetDirection           ENDP
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; doRotateTurretAbs
+;
+; Description:      This function sets the turret angle to that specified
+;                   by the input number angle.
+;                   Should be the "transition" function of the T state when
+;                   it is directly followed by digits and then it
+;                   encounters a return \r character.
+;
+; Operation:        Call SetTurretAngle with inputNumber argument in AX.
+;                   Return PARSE_SUCCESS in AX.
+;
+; Arguments:        None.
+;
+; Return Value:     AX = parsing status = PARSE_SUCCESS
+;
+; Local Variables:  AX = inputNumber (angle)
+;
+; Shared Variables: inputNumber (R)
+;
+; Global Variables: None.
+;
+; Input:            None.
+;
+; Output:           None.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+;
+; Data Structures:  None.
+;
+; Registers Used:   AX
+;
+; Stack Depth:      1 call
+;
+; Author:           Archan Luhar
+; Last Modified:    1/24/2014
+
 doRotateTurretAbs           PROC    NEAR
 
-BeginDoRotateTurretAbs:
+    ; Get angle and call setter function
     MOV AX, inputNumber
     CALL SetTurretAngle
 
-    ;JMP EndDoRotateTurretAbs
-
-EndDoRotateTurretAbs:
+    ; Indicate success and return
     MOV AX, PARSE_SUCCESS
     RET
 
 doRotateTurretAbs           ENDP
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; doRotateTurretAbs
+;
+; Description:      This function changes the turret angle by the amount
+;                   specified by the input number angle.
+;                   Should be the "transition" function of the T state when
+;                   it is followed by a sign (+/-) and digits and then it
+;                   encounters a return \r character.
+;
+; Operation:        Call SetRelTurretAngle with inputNumber argument in AX.
+;                   Return PARSE_SUCCESS in AX.
+;
+; Arguments:        None.
+;
+; Return Value:     AX = parsing status = PARSE_SUCCESS
+;
+; Local Variables:  AX = inputNumber (angle)
+;
+; Shared Variables: inputNumber (R)
+;
+; Global Variables: None.
+;
+; Input:            None.
+;
+; Output:           None.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+;
+; Data Structures:  None.
+;
+; Registers Used:   AX
+;
+; Stack Depth:      1 call
+;
+; Author:           Archan Luhar
+; Last Modified:    1/24/2014
+
 doRotateTurretRel           PROC    NEAR
 
-BeginDoRotateTurretRel:
-    PUSH BX
-
+    ; Get angle and call relative setter function
     MOV AX, inputNumber
     CALL SetRelTurretAngle
 
-    ;JMP EndDoRotateTurretRel
-
-EndDoRotateTurretRel:
+    ; Indicate success and return
     MOV AX, PARSE_SUCCESS
-    POP BX
     RET
 
 doRotateTurretRel           ENDP
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; doSetTurretElevation
+;
+; Description:      This function sets the turret elevation to that specified
+;                   by the input number angle.
+;                   Should be the "transition" function of the E state when
+;                   it is followed by (optional + sign and) digits and then it
+;                   encounters a return \r character.
+;
+; Operation:        Call SetTurretElevation with inputNumber argument in AX.
+;                   Return PARSE_SUCCESS in AX.
+;
+; Arguments:        None.
+;
+; Return Value:     AX = parsing status = PARSE_SUCCESS
+;
+; Local Variables:  AX = inputNumber (angle)
+;
+; Shared Variables: inputNumber (R)
+;
+; Global Variables: None.
+;
+; Input:            None.
+;
+; Output:           None.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+;
+; Data Structures:  None.
+;
+; Registers Used:   AX
+;
+; Stack Depth:      1 call
+;
+; Author:           Archan Luhar
+; Last Modified:    1/24/2014
+
 doSetTurretElevation    PROC    NEAR
 
-BeginDoSetTurretElevation:
+    ; Get angle and call setter function
     MOV AX, inputNumber
     CALL SetTurretElevation
 
-    ;JMP EndDoSetTurretElevation
-
-EndDoSetTurretElevation:
+    ; Indicate success and return
     MOV AX, PARSE_SUCCESS
     RET
 
 doSetTurretElevation    ENDP
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; doLaserOn
+;
+; Description:      This function turns on the laser.
+;                   Should be the "transition" function of the F state when
+;                   it is followed by a return \r character.
+;
+; Operation:        Call SetLaser with TRUE argument in AX.
+;                   Return PARSE_SUCCESS in AX.
+;
+; Arguments:        None.
+;
+; Return Value:     AX = parsing status = PARSE_SUCCESS
+;
+; Local Variables:  AX = laser state = TRUE
+;
+; Shared Variables: None.
+;
+; Global Variables: None.
+;
+; Input:            None.
+;
+; Output:           None.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+;
+; Data Structures:  None.
+;
+; Registers Used:   AX
+;
+; Stack Depth:      1 call
+;
+; Author:           Archan Luhar
+; Last Modified:    1/24/2014
+
 doLaserOn       PROC    NEAR
+
+    ; Set laser status to TRUE, on
     MOV AX, TRUE
     CALL SetLaser
 
+    ; Indicate success and return
     MOV AX, PARSE_SUCCESS
     RET
+
 doLaserOn       ENDP
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; doLaserOff
+;
+; Description:      This function turns off the laser.
+;                   Should be the "transition" function of the F state when
+;                   it is followed by a return \r character.
+;
+; Operation:        Call SetLaser with FALSE argument in AX.
+;                   Return PARSE_SUCCESS in AX.
+;
+; Arguments:        None.
+;
+; Return Value:     AX = parsing status = PARSE_SUCCESS
+;
+; Local Variables:  AX = laser state = FALSE
+;
+; Shared Variables: None.
+;
+; Global Variables: None.
+;
+; Input:            None.
+;
+; Output:           None.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+;
+; Data Structures:  None.
+;
+; Registers Used:   AX
+;
+; Stack Depth:      1 call
+;
+; Author:           Archan Luhar
+; Last Modified:    1/24/2014
+
 doLaserOff      PROC    NEAR
 
+    ; Set laser status to FALSE, off
     MOV AX, FALSE
     CALL SetLaser
 
+    ; Indicate success and return
     MOV AX, PARSE_SUCCESS
     RET
 
@@ -1019,12 +1509,14 @@ CODE ENDS
 
 
 DATA SEGMENT PUBLIC 'DATA'
+
     ; Keep track of the current state
     ParserCurrentState  DB  ?
     
     ; Shared variables necessary for parsing input digits
     inputNumIsNegative  DB  ?
     inputNumber         DW  ?
+
 DATA ENDS
 
 

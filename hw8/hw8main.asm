@@ -3,7 +3,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;                                                                            ;
 ;                                   HW8MAIN                                  ;
-;                               Homework 7 Main                              ;
+;                               Homework 8 Main                              ;
 ;                                  EE/CS 51                                  ;
 ;                                 Archan Luhar                               ;
 ;                                 TA: Joe Greef                              ;
@@ -60,7 +60,7 @@ MAIN:
     
     STI
     
-    CALL    ParseTest
+    CALL    ParseTest               ; Call parser test function
 
 EndMain:
     HLT
