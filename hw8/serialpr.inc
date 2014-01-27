@@ -1,13 +1,23 @@
-; Serial Parser Include File
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;                                                                            ;
+;                                SERIALPR include                            ;
+;                                   EE/CS 51                                 ;
+;                                 Archan Luhar                               ;
+;                                 TA: Joe Greef                              ;
+;                                                                            ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; This file contains the definitions for the serial parsing state machine.
+;
+; Revision History:
+;     1/23/14  Archan Luhar     Initial version of the include file. Set up
+;                               some base definitions.
+;     1/26/13  Archan Luhar     Finished adding token and state definitions.
 
 ; Serial Processing Definitions
-PARSE_SUCCESS   EQU 0
-PARSE_FAILURE   EQU 1
-
-INPUT_NUM_BASE  EQU 10
-
-
-
+PARSE_SUCCESS   EQU 0           ; Parse success indicator
+PARSE_FAILURE   EQU 1           ; Parse fail indicator
+INPUT_NUM_BASE  EQU 10          ; Base for input number digit characters
 
 
 ; States for the serial processor state machine
