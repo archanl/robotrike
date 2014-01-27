@@ -242,7 +242,7 @@ InputNumDigitMakeSpace:
     ;JNE InputNumDigitAddDigit
 
 InputNumDigitAddDigit:
-    MUL BX                      ; (DX|AX) <-- AX * BX
+    IMUL BX                      ; (DX|AX) <-- AX * BX
     JO InputNumDigitFailure
     ADD AX, CX
     JO InputNumDigitFailure
@@ -310,6 +310,7 @@ doSetRelSpeed           PROC    NEAR
 
 BeginDoSetRelSpeed:
     PUSH BX
+    PUSH CX
 
     CALL GetMotorSpeed
     MOV BX, inputNumber
@@ -319,9 +320,11 @@ BeginDoSetRelSpeed:
 
     
 doSetRelSpeedSatAdd:
+    MOV CX, AX
     ADD AX, BX
-    JNC doSetRelSpeedDoSet
-    ;JC doSetRelSpeedSatUp
+    CMP AX, CX
+    JAE doSetRelSpeedDoSet
+    ;JNA doSetRelSpeedSatUp
 
 doSetRelSpeedSatUp:
     MOV AX, MAX_SPEED
@@ -348,6 +351,7 @@ doSetRelSpeedDoSet:
 
 EndDoSetRelSpeed:
     MOV AX, PARSE_SUCCESS
+    POP CX
     POP BX
     RET
 
