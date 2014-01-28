@@ -23,10 +23,11 @@
 ;           external functions as the command is described from the char stream.
 ;
 ; Revision History:
-;        1/20/2011      Archan Luhar    Started coding structure of the SM
-;        1/23/2011      Archan Luhar    Finished coding
-;        1/25/2011      Archan Luhar    Finished debugging
-;        1/26/2011      Archan Luhar    Finished commenting
+;        1/20/2014      Archan Luhar    Started coding structure of the SM
+;        1/23/2014      Archan Luhar    Finished coding
+;        1/25/2014      Archan Luhar    Finished debugging
+;        1/26/2014      Archan Luhar    Finished commenting
+;        1/28/2014      Archan Luhar    Added code to output current status.
 
 
 
@@ -53,13 +54,13 @@ CODE    SEGMENT PUBLIC 'CODE'
     EXTRN   GetMotorDirection:NEAR
     EXTRN   SetLaser:NEAR
     EXTRN   GetLaser:NEAR
-    EXTRN   SetTurretAngle:NEAR
+    EXTRN   SetTurretAngle:NEAR         ; Turret procedures are dummies
     EXTRN   GetTurretAngle:NEAR
     EXTRN   SetRelTurretAngle:NEAR
     EXTRN   SetTurretElevation:NEAR
     EXTRN   GetTurretElevation:NEAR
-    EXTRN   Dec2String:NEAR
-    EXTRN   SerialPutChar:NEAR
+    EXTRN   Dec2String:NEAR             ; Needed for converting status number
+    EXTRN   SerialPutChar:NEAR          ; Needed for outputing status
     
 
 
@@ -108,157 +109,6 @@ InitSerialParser    PROC    NEAR
 
 InitSerialParser ENDP
 
-
-
-
-SerialOutOutputText PROC    NEAR
-
-BeginSerialOutOutputText:
-    PUSH AX
-    PUSH DI
-    MOV DI, OFFSET(SerialOutputText)
-
-LoopSerialOutOutputText:
-    CMP BYTE PTR [DI], ASCII_NULL
-    JE EndSerialOutOutputText
-    
-    MOV AL, BYTE PTR [DI]
-    CALL SerialPutChar
-    INC DI
-    
-    JMP LoopSerialOutOutputText
-
-EndSerialOutOutputText:
-    MOV AL, SCHAR_END
-    CALL SerialPutChar
-
-    POP DI
-    POP AX
-    RET
-
-SerialOutOutputText ENDP
-
-
-SerialOutSpeed      PROC    NEAR
-
-    PUSH BX
-    PUSH SI
-    PUSH ES
-    PUSH AX
-    PUSH DX
-    
-    MOV AL, 'S'
-    CALL SerialPutChar
-    MOV AL, 'P'
-    CALL SerialPutChar
-    MOV AL, 'E'
-    CALL SerialPutChar
-    MOV AL, 'E'
-    CALL SerialPutChar
-    MOV AL, 'D'
-    CALL SerialPutChar
-    
-    CALL GetMotorSpeed
-    XOR DX, DX
-    MOV BX, 655  ; 1 percent of MAX_SPEED
-    DIV BX
-    ; Speed percentage is now in AX
-    
-    MOV BX, DS
-    MOV ES, BX
-    MOV SI, OFFSET(SerialOutputText)
-    CALL Dec2String
-    CALL SerialOutOutputText
-    
-    POP DX
-    POP AX
-    POP ES
-    POP SI
-    POP BX
-    RET
-    
-SerialOutSpeed      ENDP
-
-SerialOutDirection  PROC    NEAR
-
-    PUSH BX
-    PUSH SI
-    PUSH ES
-    PUSH AX
-    
-    MOV AL, 'D'
-    CALL SerialPutChar
-    MOV AL, 'I'
-    CALL SerialPutChar
-    MOV AL, 'R'
-    CALL SerialPutChar
-    MOV AL, 'E'
-    CALL SerialPutChar
-    MOV AL, 'C'
-    CALL SerialPutChar
-    
-    CALL GetMotorDirection
-    ; Direction (0 to 360) is now in AX
-    
-    MOV BX, DS
-    MOV ES, BX
-    MOV SI, OFFSET(SerialOutputText)
-    CALL Dec2String
-    CALL SerialOutOutputText
-    
-    POP AX
-    POP ES
-    POP SI
-    POP BX
-    RET
-
-SerialOutDirection  ENDP
-
-
-SerialOutLaser      PROC    NEAR
-
-BeginSerialOutLaser:
-    PUSH AX
-    
-    MOV AL, 'L'
-    CALL SerialPutChar
-    MOV AL, 'A'
-    CALL SerialPutChar
-    MOV AL, 'S'
-    CALL SerialPutChar
-    MOV AL, 'E'
-    CALL SerialPutChar
-    MOV AL, 'R'
-    CALL SerialPutChar
-
-    CALL GetLaser
-    CMP AX, TRUE
-    JE SerialOutLaserOn
-    
-SerialOutLaserOff:
-    MOV AL, 'O'
-    CALL SerialPutChar
-    MOV AL, 'F'
-    CALL SerialPutChar
-    MOV AL, 'F'
-    CALL SerialPutChar
-    JMP EndSerialOutLaser
-    
-SerialOutLaserOn:
-    MOV AL, 'O'
-    CALL SerialPutChar
-    MOV AL, 'N'
-    CALL SerialPutChar
-    JMP EndSerialOutLaser
-
-EndSerialOutLaser:
-    MOV AL, SCHAR_END
-    CALL SerialPutChar
-
-    POP AX
-    RET
-
-SerialOutLaser      ENDP
 
 
 ; ParseSerialChar
@@ -1674,6 +1524,284 @@ TokenValueTable    LABEL       BYTE
 
 
 
+        
+        
+
+; SerialOutOutputText
+;
+; Description:      Outputs the SerialOutputText string via serial.
+;
+; Operation:        Go through each character of SerialOutputText and queue
+;                   it up for serial. Then queue up to serial the end character.
+;
+; Arguments:        None.
+; Return Value:     None.
+;
+; Local Variables:  AL = argument for SerialPutChar
+; Shared Variables: SerialOutputText (R)
+; Global Variables: None.
+;
+; Input:            None.
+; Output:           Queues up characters for output via serial port.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+; Data Structures:  None.
+;
+; Registers Used:   None.
+; Stack Depth:      2 words + call
+;
+; Author:           Archan Luhar
+; Last Modified:    Jan. 28, 2014
+
+SerialOutOutputText PROC    NEAR
+
+BeginSerialOutOutputText:
+    PUSH AX
+    PUSH DI
+    MOV DI, OFFSET(SerialOutputText)
+
+LoopSerialOutOutputText:
+    CMP BYTE PTR [DI], ASCII_NULL
+    JE EndSerialOutOutputText
+    
+    MOV AL, BYTE PTR [DI]
+    CALL SerialPutChar
+    INC DI
+    
+    JMP LoopSerialOutOutputText
+
+EndSerialOutOutputText:
+    MOV AL, SCHAR_END
+    CALL SerialPutChar
+
+    POP DI
+    POP AX
+    RET
+
+SerialOutOutputText ENDP
+
+
+; SerialOutSpeed
+;
+; Description:      Outputs the current speed status via serial. Should be
+;                   called after changing the motor speed.
+;
+; Operation:        Output the characters "SPEED" followed by the actual speed
+;                   converted to a string representing the percentage of the max
+;                   speed.
+;
+; Arguments:        None.
+; Return Value:     None.
+;
+; Local Variables:  AL = argument for SerialPutChar
+;                   BX = divisor to convert speed to percentage
+;                   BX = intermediate register for copying DS to ES
+;                   ES:SI = DS:offset to start of buffer to write percent chars
+;
+; Shared Variables: SerialOutputText (W)
+; Global Variables: None.
+;
+; Input:            None.
+; Output:           Queues up characters for output via serial port.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+; Data Structures:  None.
+;
+; Registers Used:   None.
+; Stack Depth:      5 words + call
+;
+; Author:           Archan Luhar
+; Last Modified:    Jan. 28, 2014
+
+SerialOutSpeed      PROC    NEAR
+
+    PUSH BX
+    PUSH SI
+    PUSH ES
+    PUSH AX
+    PUSH DX
+    
+    MOV AL, 'S'
+    CALL SerialPutChar
+    MOV AL, 'P'
+    CALL SerialPutChar
+    MOV AL, 'E'
+    CALL SerialPutChar
+    MOV AL, 'E'
+    CALL SerialPutChar
+    MOV AL, 'D'
+    CALL SerialPutChar
+    
+    CALL GetMotorSpeed
+    XOR DX, DX
+    MOV BX, 655  ; 1 percent of MAX_SPEED
+    DIV BX
+    ; Speed percentage is now in AX
+    
+    MOV BX, DS
+    MOV ES, BX
+    MOV SI, OFFSET(SerialOutputText)
+    CALL Dec2String
+    CALL SerialOutOutputText
+    
+    POP DX
+    POP AX
+    POP ES
+    POP SI
+    POP BX
+    RET
+    
+SerialOutSpeed      ENDP
+
+
+; SerialOutDirection
+;
+; Description:      Outputs the current direction status via serial. Should be
+;                   called after changing the motor direction.
+;
+; Operation:        Output the characters "DIREC" followed by the direction as
+;                   the degree number converted to string representation.
+;
+; Arguments:        None.
+; Return Value:     None.
+;
+; Local Variables:  AL = argument for SerialPutChar
+;                   BX = intermediate register for copying DS to ES
+;                   ES:SI = DS:offset to start of buffer to write percent chars
+;
+; Shared Variables: SerialOutputText (W)
+; Global Variables: None.
+;
+; Input:            None.
+; Output:           Queues up characters for output via serial port.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+; Data Structures:  None.
+;
+; Registers Used:   None.
+; Stack Depth:      f words + call
+;
+; Author:           Archan Luhar
+; Last Modified:    Jan. 28, 2014
+
+SerialOutDirection  PROC    NEAR
+
+    PUSH BX
+    PUSH SI
+    PUSH ES
+    PUSH AX
+    
+    MOV AL, 'D'
+    CALL SerialPutChar
+    MOV AL, 'I'
+    CALL SerialPutChar
+    MOV AL, 'R'
+    CALL SerialPutChar
+    MOV AL, 'E'
+    CALL SerialPutChar
+    MOV AL, 'C'
+    CALL SerialPutChar
+    
+    CALL GetMotorDirection
+    ; Direction (0 to 360) is now in AX
+    
+    MOV BX, DS
+    MOV ES, BX
+    MOV SI, OFFSET(SerialOutputText)
+    CALL Dec2String
+    CALL SerialOutOutputText
+    
+    POP AX
+    POP ES
+    POP SI
+    POP BX
+    RET
+
+SerialOutDirection  ENDP
+
+
+; SerialOutDirection
+;
+; Description:      Outputs the current laser status via serial. Should be
+;                   called after changing the laser power on or off.
+;
+; Operation:        Output the characters "LASER" followed by the "ON" if the
+;                   laser is on or "OFF" if it is off. Output the end char to
+;                   signify end of string.
+;
+; Arguments:        None.
+; Return Value:     None.
+;
+; Local Variables:  AL = argument for SerialPutChar
+;
+; Shared Variables: None.
+; Global Variables: None.
+;
+; Input:            None.
+; Output:           Queues up characters for output via serial port.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+; Data Structures:  None.
+;
+; Registers Used:   None.
+; Stack Depth:      1 word + call
+;
+; Author:           Archan Luhar
+; Last Modified:    Jan. 28, 2014
+
+SerialOutLaser      PROC    NEAR
+
+BeginSerialOutLaser:
+    PUSH AX
+    
+    MOV AL, 'L'
+    CALL SerialPutChar
+    MOV AL, 'A'
+    CALL SerialPutChar
+    MOV AL, 'S'
+    CALL SerialPutChar
+    MOV AL, 'E'
+    CALL SerialPutChar
+    MOV AL, 'R'
+    CALL SerialPutChar
+
+    CALL GetLaser
+    CMP AX, TRUE
+    JE SerialOutLaserOn
+    
+SerialOutLaserOff:
+    MOV AL, 'O'
+    CALL SerialPutChar
+    MOV AL, 'F'
+    CALL SerialPutChar
+    MOV AL, 'F'
+    CALL SerialPutChar
+    JMP EndSerialOutLaser
+    
+SerialOutLaserOn:
+    MOV AL, 'O'
+    CALL SerialPutChar
+    MOV AL, 'N'
+    CALL SerialPutChar
+    JMP EndSerialOutLaser
+
+EndSerialOutLaser:
+    MOV AL, SCHAR_END
+    CALL SerialPutChar
+
+    POP AX
+    RET
+
+SerialOutLaser      ENDP
+
 
 CODE ENDS
 
@@ -1687,7 +1815,7 @@ DATA SEGMENT PUBLIC 'DATA'
     inputNumIsNegative  DB  ?
     inputNumber         DW  ?
     
-    
+    ; Temporary buffer for writing status numbers (e.g. speed -> string)
     SerialOutputText        DB  MAX_TEXT_LENGTH DUP (?)
 
 DATA ENDS

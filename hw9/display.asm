@@ -15,6 +15,8 @@
 ; or decimal number.
 ;
 ; The included public functions are:
+;   - InitDisplay
+;           Initializes display hardware and data. Must be called at start.
 ;   - DisplayTimerEventHandler
 ;           Updates the display, iterating over the display buffer
 ;   - Display

@@ -12,12 +12,20 @@
 
 $INCLUDE(general.inc)
 
-; 
+; The file contains functions to convert numbers to strings. It contains the
+; following public procedures.
+;   - Dec2String
+;           Writes a base 10 string representation of a given signed number to
+;           a given buffer.
+;   - Dec2String
+;           Writes a base 16 string representation of a given unsigned number to
+;           a given buffer.
 ;
 ; Revision History:
 ;     1/26/06  Glen George      initial revision
 ;    10/26/13  Archan Luhar     Finished Homework 2
 ;    11/18/13  Archan Luhar     Cleaned up formatting
+;     1/28/14  Archan Luhar     Added better top header description
 
 
 CGROUP  GROUP   CODE

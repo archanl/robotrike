@@ -33,11 +33,13 @@ motorassemble:
 	asm86 motors.asm m1 ep db
 	asm86 trigtbl.asm m1 ep db
 
-	
+
 commonlink:
 	link86 converts.obj,cselect.obj,events.obj,queue.obj,serial.obj to common.lnk
+	
 remonlylink:
 	link86 RemMain.obj,RemEvent.obj,RemTimer.obj,KeyParse.obj,RemParse.obj,segtab14.obj,display.obj,switches.obj to remonly.lnk
+	
 motonlylink:
 	link86 MotMain.obj,MotTimer.obj,MotEvent.obj,MotParse.obj,motors.obj,trigtbl.obj to motonly.lnk
 	
@@ -45,6 +47,7 @@ remotelink:
 	link86 remonly.lnk,common.lnk to remote.lnk
 motorlink:
 	link86 motonly.lnk,common.lnk to motor.lnk
+
 
 remotelocate:
 	loc86 remote.lnk NOIC AD(SM(CODE(400H),DATA(4000H), STACK(7000H)))

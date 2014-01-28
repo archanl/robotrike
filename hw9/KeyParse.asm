@@ -10,19 +10,21 @@
 ;                                                                            ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; This file contains functions to handle characters as they come linearly via
-; the serial port. A state machine is used to keep track of the type and values
-; of the characters that are being processed.
+; This file contains functions to handle key presses in the remote unit.
+; A table is used to map the key to a procedure. This can be easily
+; modified to a table of multiple but currently the UI is very basic and
+; has only one state.
 ;
 ; The included public functions are:
 ;   - InitKeyParser
 ;           Initializes the current state of the state machine. MUST be called
-;           before using ParseSerialChar.
+;           before using ParseKey.
 ;   - ParseKey
-;           Given a key, update the state machine and call relevant
-;           functions.
+;           Given a key, execute related function.
 ;
 ; Revision History:
+;  1/27/2014    Archan Luhar        Finished key parsing table and functions
+;  1/28/2014    Archan Luhar        Finished commenting
 
 
 
@@ -107,7 +109,8 @@ InitKeyParser ENDP
 ;
 ; Return Value:     None.
 ;
-; Local Variables:  AX = row in table
+; Local Variables:  CL = Argument copy
+;                   AX = row in table
 ;                   BX = actual offset into table
 ;
 ; Shared Variables: KeyParserCurrentState (R/W)
@@ -126,10 +129,10 @@ InitKeyParser ENDP
 ;
 ; Registers Used:   None.
 ;
-; Stack Depth:      2 words + call.
+; Stack Depth:      3 words + call.
 ;
-; Author:           Archan Luhar
-; Last Modified:    1/23/2014
+; Author:           Glen George (state machine lookup), Archan Luhar
+; Last Modified:    1/27/2014
 
 ParseKey 	PROC    NEAR
             PUBLIC  ParseKey
@@ -138,22 +141,22 @@ StartParseKey:
     PUSH AX
     PUSH BX
     PUSH CX
-	MOV CL, AL
+	MOV CL, AL                  ; CL = argument copy
 
-TransitionParseKey:      ;figure out what transition to do
-    MOV	AL, NUM_KEYS        ;find row in the table
-    MUL	KeyParserCurrentState  ;AX is start of row for current state
-    ADD	AL, CL              ;get the actual transition by adding key number
-    ADC	AH, 0               ;propagate low byte carry into high byte
+ParseKeyTransition:             ;figure out what transition to do
+    MOV	AL, NUM_KEYS            ;find row in the table
+    MUL	KeyParserCurrentState   ;AX is start of row for current state
+    ADD	AL, CL                  ;get the actual transition by adding key number
+    ADC	AH, 0                   ;propagate low byte carry into high byte
 
     IMUL BX, AX, SIZE KEY_TRANSITION_ENTRY  ; BX = to table offset
 
 ParseKeyDoActions:
-    CALL CS:KeyTable[BX].ACTION	    ;do the action
+    CALL CS:KeyTable[BX].ACTION	            ;do the action
 
-ParseKeyDoTransition:				            ; Update the current state to
-    MOV CL, CS:KeyTable[BX].NEXTSTATE ; the next state specified
-    MOV KeyParserCurrentState, CL
+ParseKeyDoTransition:
+    MOV CL, CS:KeyTable[BX].NEXTSTATE       ; Update the current state to
+    MOV KeyParserCurrentState, CL           ; the next state specified
 
 EndParseKey:
     POP CX
@@ -170,7 +173,8 @@ ParseKey 	ENDP
 
 ; doNOP
 ;
-; Description:      This function does nothing but returns.
+; Description:      This function does nothing but returns. Useful for keys
+;                   that don't do anything.
 ;
 ; Operation:        Do nothing. Return.
 ;
@@ -207,6 +211,40 @@ doNOP           PROC    NEAR
 doNOP           ENDP
 
 
+; doTurnLeft
+;
+; Description:      Send command to turn left slightly.
+;
+; Operation:        Send via serial the direction command character followed by
+;                   minus sign followed by the angle step constant followed by
+;                   the end command character.
+;
+; Arguments:        None.
+;
+; Return Value:     None.
+;
+; Local Variables:  None.
+;
+; Shared Variables: None.
+;
+; Global Variables: None.
+;
+; Input:            None.
+;
+; Output:           Serial.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+;
+; Data Structures:  None.
+;
+; Registers Used:   None.
+;
+; Stack Depth:      1 word + call
+;
+; Author:           Archan Luhar
+; Last Modified:    1/27/2014
 
 doTurnLeft      PROC    NEAR
 
@@ -230,6 +268,41 @@ doTurnLeft      PROC    NEAR
 doTurnLeft      ENDP
 
 
+; doTurnRight
+;
+; Description:      Send command to turn right slightly.
+;
+; Operation:        Send via serial the direction command character followed by
+;                   followed by the angle step constant followed by
+;                   the end command character.
+;
+; Arguments:        None.
+;
+; Return Value:     None.
+;
+; Local Variables:  None.
+;
+; Shared Variables: None.
+;
+; Global Variables: None.
+;
+; Input:            None.
+;
+; Output:           Serial.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+;
+; Data Structures:  None.
+;
+; Registers Used:   None.
+;
+; Stack Depth:      1 word + call
+;
+; Author:           Archan Luhar
+; Last Modified:    1/27/2014
+
 doTurnRight     PROC    NEAR
 
     PUSH AX
@@ -252,6 +325,40 @@ doTurnRight     PROC    NEAR
 doTurnRight     ENDP
 
 
+; doStop
+;
+; Description:      Send command to set speed to 0.
+;
+; Operation:        Send via serial the absolute speed command character
+;                   followed by the 0 character followed by
+;                   the end command character.
+;
+; Arguments:        None.
+;
+; Return Value:     None.
+;
+; Local Variables:  None.
+;
+; Shared Variables: None.
+;
+; Global Variables: None.
+;
+; Input:            None.
+;
+; Output:           Serial.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+;
+; Data Structures:  None.
+;
+; Registers Used:   None.
+;
+; Stack Depth:      1 word + call
+;
+; Author:           Archan Luhar
+; Last Modified:    1/27/2014
 
 doStop          PROC    NEAR
 
@@ -272,7 +379,42 @@ doStop          PROC    NEAR
 doStop          ENDP
 
 
-doGoForward     PROC    NEAR
+; doSpeedUp
+;
+; Description:      Send command to increase relative speed.
+;
+; Operation:        Send via serial the relative speed command character
+;                   followed by the one percent speed step characters
+;                   followed by the end command character.
+;
+; Arguments:        None.
+;
+; Return Value:     None.
+;
+; Local Variables:  None.
+;
+; Shared Variables: None.
+;
+; Global Variables: None.
+;
+; Input:            None.
+;
+; Output:           Serial.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+;
+; Data Structures:  None.
+;
+; Registers Used:   None.
+;
+; Stack Depth:      1 word + call
+;
+; Author:           Archan Luhar
+; Last Modified:    1/27/2014
+
+doSpeedUp     PROC    NEAR
 
     PUSH AX
     
@@ -292,10 +434,46 @@ doGoForward     PROC    NEAR
     POP AX
     RET
     
-doGoForward     ENDP
+doSpeedUp     ENDP
 
 
-doGoReverse     PROC    NEAR
+; doSlowDown
+;
+; Description:      Send command to decrease relative speed.
+;
+; Operation:        Send via serial the relative speed command character
+;                   followed by the negative sign
+;                   followed by the one percent speed step characters
+;                   followed by the end command character.
+;
+; Arguments:        None.
+;
+; Return Value:     None.
+;
+; Local Variables:  None.
+;
+; Shared Variables: None.
+;
+; Global Variables: None.
+;
+; Input:            None.
+;
+; Output:           Serial.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+;
+; Data Structures:  None.
+;
+; Registers Used:   None.
+;
+; Stack Depth:      1 word + call
+;
+; Author:           Archan Luhar
+; Last Modified:    1/27/2014
+
+doSlowDown     PROC    NEAR
 
     PUSH AX
     
@@ -318,9 +496,42 @@ doGoReverse     PROC    NEAR
     POP AX
     RET
     
-doGoReverse     ENDP
+doSlowDown     ENDP
 
 
+; doLaserOn
+;
+; Description:      Send command to turn on laser.
+;
+; Operation:        Send via serial the fire laser command character
+;                   followed by the end command character.
+;
+; Arguments:        None.
+;
+; Return Value:     None.
+;
+; Local Variables:  None.
+;
+; Shared Variables: None.
+;
+; Global Variables: None.
+;
+; Input:            None.
+;
+; Output:           Serial.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+;
+; Data Structures:  None.
+;
+; Registers Used:   None.
+;
+; Stack Depth:      1 word + call
+;
+; Author:           Archan Luhar
+; Last Modified:    1/27/2014
 
 doLaserOn       PROC    NEAR
 
@@ -337,6 +548,40 @@ doLaserOn       PROC    NEAR
     
 doLaserOn       ENDP
 
+
+; doLaserOff
+;
+; Description:      Send command to turn off laser.
+;
+; Operation:        Send via serial the turn off laser command character
+;                   followed by the end command character.
+;
+; Arguments:        None.
+;
+; Return Value:     None.
+;
+; Local Variables:  None.
+;
+; Shared Variables: None.
+;
+; Global Variables: None.
+;
+; Input:            None.
+;
+; Output:           Serial.
+;
+; Error Handling:   None.
+;
+; Algorithms:       None.
+;
+; Data Structures:  None.
+;
+; Registers Used:   None.
+;
+; Stack Depth:      1 word + call
+;
+; Author:           Archan Luhar
+; Last Modified:    1/27/2014
 
 doLaserOff      PROC    NEAR
 
@@ -358,7 +603,7 @@ doLaserOff      ENDP
 
 ; KeyTable
 ;
-; Description:      This is the state transition table for the Remote UI.
+; Description:      This is the state transition table for the Remote keypad.
 ;                   Each entry consists of the next state and actions for that
 ;                   transition.  The rows are associated with the current
 ;                   state and the columns with the input type.
@@ -387,9 +632,9 @@ KeyTable    LABEL    KEY_TRANSITION_ENTRY
     %TRANSITION(K_INITIAL, doTurnLeft)              ;Key 3
     %TRANSITION(K_INITIAL, doNOP)                   ;Key 4
     %TRANSITION(K_INITIAL, doNOP)                   ;Key 5
-    %TRANSITION(K_INITIAL, doGoForward)             ;Key 6
+    %TRANSITION(K_INITIAL, doSpeedUp)               ;Key 6
     %TRANSITION(K_INITIAL, doStop)                  ;Key 7
-    %TRANSITION(K_INITIAL, doGoReverse)             ;Key 8
+    %TRANSITION(K_INITIAL, doSlowDown)              ;Key 8
     %TRANSITION(K_INITIAL, doNOP)                   ;Key 9
     %TRANSITION(K_INITIAL, doNOP)                   ;Key 10
     %TRANSITION(K_INITIAL, doTurnRight)             ;Key 11

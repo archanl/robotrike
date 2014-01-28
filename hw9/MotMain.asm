@@ -58,18 +58,18 @@ MAIN:
     MOV     AX, DGROUP              ; Initialize the data segment
     MOV     DS, AX
 
-    CALL    InitCS
-    CALL    InitMotorTimers
-    CALL    InitParallel              ; Parallel timer
-    CALL    InitSerialPort
-    CALL    InitSerialParser
-    CALL    InitEventQueue
+    CALL    InitCS                  ; Init chip select
+    CALL    InitMotorTimers         ; Init motor timers and handlers
+    CALL    InitParallel            ; Init parallel
+    CALL    InitSerialPort          ; Init serial
+    CALL    InitSerialParser        ; Init serial parser
+    CALL    InitEventQueue          ; Init events
     
     STI
     
 MotorMainLoop:                      ; Wait for things to happen
-    CALL DequeueEvent
-    CALL EventHandler
+    CALL DequeueEvent               ; Dequeue event (blocking)
+    CALL EventHandler               ; Call event handler with this event
     JMP MotorMainLoop
 
 EndMain:

@@ -12,12 +12,27 @@
 
 ; Description:      This program initializes the hardware on the remote unit
 ;                   as well as the necessary timers
+;
 ; Input:            Serial.
 ; Output:           Serial, Motors, Laser.
 ;
-; User Interface:   Serial Input controls the motor unit.
+; User Interface:   Serial output controls the motor unit.
+;                   Switch  6 - speed up
+;                   Switch  7 - stop
+;                   Switch  8 - slow down
+;                   Switch  3 - turn left (rotate direction -5 degrees)
+;                   Switch 11 - turn right (rotate direction +5 degrees)
+;                   Switch 15 - Fire laser
+;                   Switch 16 - Turn off laser
+;                   Display shows current speed (0-100) when changing it.
+;                   Display shows current direction (0-359) when changing it.
+;                   Display shows current laser status (On or Off) when changes.
 ;
-; Error Handling:   None.
+; Error Handling:   All serial output from motor unit is displayed. Thus,
+;                   if it has error, it will output error string which will
+;                   be displayed.
+;                   Mostly bad serial characters are ignored / handled properly
+;                   as not to mess up general functionality.
 ;
 ; Algorithms:       None.
 ; Data Structures:  None.
@@ -26,7 +41,7 @@
 ; Limitations:      None.
 ;
 ; Revision History:
-;    11/20/13  Archan Luhar     d
+;    11/28/13  Archan Luhar     Finished remote unit main loop
 
 
 CGROUP  GROUP   CODE
@@ -61,16 +76,16 @@ MAIN:
     MOV     AX, DGROUP              ; Initialize the data segment
     MOV     DS, AX
 
-    CALL    InitCS
-    CALL    InitRemoteTimers
-    CALL    InitSerialPort
-    CALL    InitKeyParser
-    CALL    InitSerialParser
-    CALL    InitDisplay
-    CALL    InitSwitches
-    CALL    InitEventQueue
+    CALL    InitCS                  ; Init chip select
+    CALL    InitRemoteTimers        ; Init remote timers
+    CALL    InitSerialPort          ; Init serial
+    CALL    InitKeyParser           ; Init key parser
+    CALL    InitSerialParser        ; Init serial char parser
+    CALL    InitDisplay             ; Init display hardware/data
+    CALL    InitSwitches            ; Init switches hardware/data
+    CALL    InitEventQueue          ; Init events
     
-    STI
+    STI                             ; Enable interrupts, after initialization
     
 RemoteMainLoop:                     ; Wait for things to happen
     CALL DequeueEvent

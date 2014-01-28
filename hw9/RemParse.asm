@@ -57,7 +57,7 @@ CODE    SEGMENT PUBLIC 'CODE'
 ;                   required for the serial parser. It MUST be called
 ;                   before calling ParseSerialChar.
 ;
-; Operation:        Sets the ParserCurrentState to the initial state ST_INITIAL.
+; Operation:        Sets the SerialInputText to null and its index to 0.
 ;
 ; Arguments:        None.
 ;
@@ -65,7 +65,8 @@ CODE    SEGMENT PUBLIC 'CODE'
 ;
 ; Local Variables:  None.
 ;
-; Shared Variables: ParserCurrentState (W)
+; Shared Variables: SerialInputText         (W)
+;                   SerialInputTextIndex    (W)
 ;
 ; Global Variables: None.
 ;
@@ -99,40 +100,42 @@ InitSerialParser ENDP
 
 ; ParseSerialChar
 ;
-; Description:      This function updates the serial state machine and executes
-;                   the proper functions according to the commands given via
-;                   a series of characters (expected from serial input)
+; Description:      This function updates the serial input text and displays it
+;                   if the end of the message (carraige return) character is
+;                   received.
 ;
-; Operation:        This function looks up the type and value of the given
-;                   character in a table. Then, it looks up what state to change
-;                   to next and what action to take in a table indexed by
-;                   the states and sub-indexed by the token type.
+; Operation:        If character received is carraige return, Display the text
+;                   and then reset it via the initialization procedure. Else:
+;                   Write character to SerialInputText and then a ascii null
+;                   character -- incrementing the index each time. Make sure
+;                   not to surpass MAX_TEXT_LENGTH.
 ;
 ; Arguments:        AL = character to parse.
 ;
-; Return Value:     AX = 0 (PARSE_SUCCESS) or 1 (PARSE_FAILURE)
+; Return Value:     None.
 ;
-; Local Variables:  CH, CL = token type and value
-;                   AX = rwo in table
-;                   BX = actual offset into table
+; Local Variables:  AL character to write
+;                   BX = string index (gets written to SerialInputTextIndex)
+;                   ES:SI = DS:SI string pointer
 ;
-; Shared Variables: ParserCurrentState (R/W)
+; Shared Variables: SerialInputText         (R/W)
+;                   SerialInputTextIndex    (R/W)
 ;
 ; Global Variables: None.
 ;
 ; Input:            None.
 ;
-; Output:           None.
+; Output:           Display.
 ;
-; Error Handling:   If parse error, sets current state to ST_INITIAL.
+; Error Handling:   No more than MAX_TEXT_LENGTH characters are written.
 ;
 ; Algorithms:       None.
 ;
-; Data Structures:  State Machine (table lookup).
+; Data Structures:  Indexed string.
 ;
-; Registers Used:   AX
+; Registers Used:   flags
 ;
-; Stack Depth:      2 words + call.
+; Stack Depth:      3 words + call.
 ;
 ; Author:           Archan Luhar
 ; Last Modified:    1/23/2014

@@ -14,6 +14,8 @@
 ; the parallel output to the motors and the laser.
 ;
 ; The included public functions are:
+;   - InitParallel
+;           Initializes parallel port. Must be called at start of program.
 ;   - SwitchesTimerEventHandler
 ;           Checks the switches to see if any are pressed and debounces them and
 ;           calls the appropriate switch handler (currently just a test function
@@ -24,7 +26,7 @@
 ;
 ; Revision History:
 ;       11/29/2013      Archan Luhar    Started Motors.
-;
+;        1/27/2014      Archan Luhar    Store angle in 0-359 range.
 
 ; local includes
 $INCLUDE(general.inc)
@@ -44,7 +46,7 @@ CODE    SEGMENT PUBLIC 'CODE'
 
 
     
-; SetMotorSpeed
+; InitParallel
 ;
 ; Description:      This function initializes the memory for shared variables
 ;                   used by the parallel port functions. This function must be
@@ -192,7 +194,7 @@ InitParallel    ENDP
 ; Stack Depth:      .
 ;
 ; Author:           Archan Luhar
-; Last Modified:    11/30/2013
+; Last Modified:    1/28/2014
 
 SetMotorSpeed   PROC NEAR
                 PUBLIC SetMotorSpeed

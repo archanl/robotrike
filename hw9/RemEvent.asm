@@ -10,6 +10,14 @@
 ;                                                                            ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+; This file contains the event handler for the remote unit.
+;
+; The included public functions are:
+;   - EventHandler
+;           Handles a local event given event type in AH and value in AL.
+;
+; Revision History:
+;        1/24/2014      Archan Luhar    Wrote event handler for remote unit.
 
 $INCLUDE(general.inc)
 $INCLUDE(events.inc)
@@ -35,7 +43,41 @@ STRING_SERIAL_ERROR LABEL BYTE
     DB ASCII_NULL
 
 
-    
+; EventHandler
+;
+; Description:      Handles local (as supposed to system wide) events.
+;                   Should be called with an event that is dequeued from the
+;                   event queue.
+;
+; Operation:        Compare the event type to serial error event code or
+;                   serial character received code. Execute ParseSerialChar
+;                   if character received. Execute ParseKey if switch pressed.
+;                   Display serial error if serial error event. Display general
+;                   error otherwise.
+;
+; Arguments:        AH, AL = event type, event value
+; Return Value:     None.
+;
+; Local Variables:  AL = argument for SerialPutChar or ParseSerialChar
+;                   ES:SI = CS:SI pointer to error string
+;
+; Shared Variables: None.
+; Global Variables: None.
+;
+; Input:            None.
+; Output:           Queues up character for output via serial port.
+;
+; Error Handling:   Bad events result in error beign displayed.
+;
+; Algorithms:       None.
+; Data Structures:  None.
+;
+; Registers Used:   None.
+; Stack Depth:      3 words + call
+;
+; Author:           Archan Luhar
+; Last Modified:    Jan. 28, 2014
+
 EventHandler        PROC        NEAR
                     PUBLIC      EventHandler
 
