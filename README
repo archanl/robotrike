@@ -1,0 +1,158 @@
+RoboTrike
+---------
+
+Archan Luhar
+Caltech EE/CS 51
+TA: Joe Greef
+
+
+SYSTEM FUNCTIONAL SPECIFICATION
+
+1.  Description
+
+The RoboTrike consists of a three-wheeled robotic car controlled by an operator
+via a remote keypad and a serial interface. There are two units, the control 
+(remote) unit and the moving (motor) unit. The control unit sends commands to
+the moving unit via a serial connection. The moving unit has three wheels and a
+laser (led) mounted on a turret. The operator can control the speed and
+direction of the RoboTrike as well as the toggle the laser.
+
+
+2. Interface
+    
+    Serial Port
+
+        Baud rate = 9600
+        Parity bits = none
+        Data bits = 8
+        Stop bits = 1
+
+        The RoboTrike uses a serial interface to communicate between the Remote
+        and Motor units.
+
+
+    16 Key Keypad Input on Remote Unit
+
+         1    5    9   13
+         2    6*  10   14
+         3*   7*  11*  15*
+         4    8*  12   16*
+
+        Key  6 = Increase Speed
+        Key  7 = Stop (set speed to 0)
+        Key  8 = Decrease Speed
+
+        Key  3 = Rotate Left
+        Key 11 = Rotate Right
+
+        Key 15 = Fire laser
+        Key 16 = Turn off laser
+
+    Serial Output on Remote Unit
+
+        The Remote Unit sends commands to the Motor Unit via the serial port.
+        A command is a series of ASCII characters followed by the return
+        carraige (ASCII code 13). See the Serial Input on the Motor Unit for
+        command specifications.
+
+        The following commands are sent when each key is pressed:
+            Key 6 Increases speed by 1%: V655
+            Key 7 Stops the Motor Unit:  S0
+            Key 8 Decreases Speed by 1%: V-655
+            Key 3 Rotates left by 5 degrees: D-5
+            Key 11 Rotates right by 5 degrees: D5
+            Key 15 Fires laser: F
+            Key 16 Turns off laser: O
+
+    Display Output on Remote Unit
+
+        The Remote Unit has 8 14-segment LED displays. They are utilized to
+        display information received from the Motor Unit.
+
+    Serial Input on Remote Unit
+
+        Baud rate = 9600
+        Parity bits = none
+        Data bits = 8
+        Stop bits = 1
+
+        All serial characters received into a 20 character max buffer until a
+        return carraige is received (ASCII code 13). Once a return carraige is
+        received, the buffer is displayed onto the Remote Unit's 8 digit
+        display. Since the display has a limitation of 8 digits, only the first
+        8 digits are displayed. Future modifications such as display scrolling
+        can be made if necessary.
+
+
+
+    Parallel Output on the Motor Unit
+        
+        The Motor Unit is equipped with a parallel port whose lines power
+        three motors and a laser (LED). The speed and direction of the Motor
+        Unit is controlled via pulse width modulation of the lines powering
+        the three motors. These three motors are a Holomonic system so the
+        trike can be made to move in any 2 dimensional direction.
+
+    Serial Input on Motor Unit
+
+        The following commands are valid on the Remote Unit. Each character
+        is an ASCII character (even the number digits). The command is
+        terminated by the return carraige (ASCII code 13).
+
+        Source: http://wolverine.caltech.edu/eecs51/homework/rcser.htm
+
+        S#: Set Absolute Speed 
+            The RoboTrike should be set to the absolute speed specified by the 
+            parameter (#). This parameter is an unsigned integer value in
+            appropriate units (the number should fit in 15-bits). The sign
+            character (‘+’ only) is optional. An absolute speed of zero (0)
+            halts the RoboTrike.
+
+        V#: Set Relative Speed 
+            The RoboTrike should be accelerated or decelerated by the relative
+            speed specified by the parameter (#). This parameter is a signed
+            16-bit integer value in the same units as the absolute speed. The
+            sign character (‘+’ or ‘-’) is optional for positive values. A
+            relative speed of 0 has no effect on the RoboTrike's speed. If after
+            adding the specified relative speed, the resulting speed is
+            negative, it should be truncated to zero (0) and the RoboTrike
+            should be halted.
+
+        D#: Set Direction
+            The RoboTrike should move in the direction specified by the
+            parameter (#) relative to the current direction of movement. This
+            parameter is a signed 16-bit integer value in units of degrees. The
+            sign character (‘+’ or ‘-’) is optional for positive values. A
+            positive angle indicates a direction to the right (looking down on
+            the RoboTrike), while a negative angle indicates a direction to the
+            left. A direction of 180 (positive or negative) is backward
+            movement.
+
+        F: Fire Laser (Laser On)
+            Indicates that the laser should be turned on.   F
+
+        O: Laser Off
+            Indicates that the laser should be turned off.  O
+
+
+    Serial Output on Motor Unit
+        
+        After each of the above commands is processed, the Motor Unit sends
+        a message via serial to the Remote Unit. Each message has a maximum of
+        8 characters so as to fit in the 8 digit LED display of the Remote Unit.
+        The purpose of this is to let the user and the Remote Unit know the
+        exact status of the Motor Unit.
+
+        This is prefereable to, for example, letting the Remote Unit just assume
+        the speed has increased or decreased when the keys are pressed.
+
+
+        Setting Speed (S or V): "SPEED#"
+            # is a string representing the percentage of the total speed (0-100)
+
+        Setting Direction (D): "DIREC#"
+            # is the degree offset from the origin (0-360)
+
+        Firing Laser (F): "LASERON"
+
+        Turning Off Laser (O): "LASEROFF"
