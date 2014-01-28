@@ -47,6 +47,9 @@ direction of the RoboTrike as well as the toggle the laser.
 
         Key 15 = Fire laser
         Key 16 = Turn off laser
+        
+        The keypad is the user interface for controlling the RoboTrike.
+        Key debouncing and accelerating keyrepeat is implemented.
 
     Serial Output on Remote Unit
 
@@ -67,7 +70,8 @@ direction of the RoboTrike as well as the toggle the laser.
     Display Output on Remote Unit
 
         The Remote Unit has 8 14-segment LED displays. They are utilized to
-        display information received from the Motor Unit.
+        display information received from the Motor Unit. All 14 segments
+        are utilized.
 
     Serial Input on Remote Unit
 
